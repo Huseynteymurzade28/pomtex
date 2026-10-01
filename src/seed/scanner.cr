@@ -46,6 +46,12 @@ module Pomtex::Seed
     BIB_STYLE     = /\\bibliographystyle\s*\{([^}]*)\}/
     FONT_SETTERS  = Regex.new(%q{\\(?:setmainfont|setsansfont|setmonofont|setmathfont|fontspec|newfontfamily\s*\\[A-Za-z@]+|newfontface\s*\\[A-Za-z@]+)} + OPT + %q<\{([^}]*)\}>)
     LUA_MARKERS   = /\\directlua|\\begin\{luacode\*?\}|\\luaexec/
+    BABEL         = /\\usepackage\s*\[([^\]]*)\]\s*\{babel\}/
+
+    # babel package options that are not language names.
+    BABEL_FLAGS = {"activeacute", "activegrave", "base", "bidi", "config", "hyphenmap", "keepshorthandsactive",
+                   "layout", "math", "noconfigs", "nocase", "provide", "safe", "shorthands", "showlanguages",
+                   "silent", "strings", "headfoot"}
 
     def scan(path : Path | String) : ScanResult
       result = ScanResult.new
@@ -77,6 +83,7 @@ module Pomtex::Seed
       each_name(code, TCB_LIBS) { |name| result.files << "tcb#{name}.code.tex" unless {"most", "all", "many"}.includes?(name) }
       each_name(code, BIB_STYLE) { |name| result.files << "#{name}.bst" }
       each_name(code, FONT_SETTERS) { |name| result.fonts << name }
+      code.scan(BABEL) { |match| babel_languages(match[1]).each { |lang| result.files << "#{lang}.ldf" } }
       result.needs_lua = true if code.matches?(LUA_MARKERS)
 
       inputs = [] of String
@@ -148,6 +155,17 @@ module Pomtex::Seed
 
     private def each_name(code : String, pattern : Regex, & : String ->) : Nil
       code.scan(pattern) { |match| split_names(match[1]).each { |name| yield name } }
+    end
+
+    # Language names from babel's options: `turkish`, or `main=turkish`.
+    def babel_languages(options : String) : Array(String)
+      options.split(',').compact_map do |option|
+        key, eq, value = option.strip.partition('=')
+        name = eq.empty? ? key : (key.strip == "main" ? value.strip : nil)
+        next unless name && name.matches?(/\A[A-Za-z]+\z/)
+        next if BABEL_FLAGS.includes?(name.downcase)
+        name
+      end
     end
 
     private def split_names(list : String) : Array(String)

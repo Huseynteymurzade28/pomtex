@@ -38,6 +38,13 @@ describe Pomtex::Seed::Scanner do
     result.suggested_engine.should eq "xelatex"
   end
 
+  it "requests babel language definitions" do
+    scan("\\usepackage[shorthands=off, english, main=turkish]{babel}").files.should eq Set{
+      "babel.sty", "english.ldf", "turkish.ldf",
+    }
+    scan("\\usepackage[safe=none,silent]{babel}").files.should eq Set{"babel.sty"}
+  end
+
   it "honours the magic program comment and lua markers" do
     scan("% !TEX program = LuaLaTeX\n\\documentclass{article}").suggested_engine.should eq "lualatex"
     scan("\\directlua{tex.print(1)}").suggested_engine.should eq "lualatex"

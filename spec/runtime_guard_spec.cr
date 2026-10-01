@@ -22,6 +22,11 @@ describe Pomtex::Engine::RuntimeGuard do
     missing.should eq [Guard::Missing.new(Guard::Missing::Kind::Font, "Libertinus Serif")]
   end
 
+  it "maps unknown babel languages to their .ldf file" do
+    log = "babel.sty:4478: Package babel Error: Unknown option 'turkish'."
+    Guard.missing_from_log(log).map(&.name).should eq ["turkish.ldf"]
+  end
+
   it "detects when another pass is needed" do
     Guard.rerun_needed?("LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.").should be_true
     Guard.rerun_needed?("Output written on main.pdf (1 page, 1234 bytes).").should be_false

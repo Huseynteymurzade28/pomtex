@@ -22,6 +22,7 @@ module Pomtex::Engine
     MISSING_ENC    = /\(file ([^()\s]+\.enc)\): cannot open encoding file/
     MISSING_MAP    = /\(file ([^()\s]+\.map)\)/
     FONTSPEC_FONT  = /The font "([^"]+)" cannot be found/
+    BABEL_LANGUAGE = /Package babel Error: Unknown option [`'"]([A-Za-z]+)'/
     RERUN          = /Rerun to get|Label\(s\) may have changed|Please \(?re\)?run LaTeX|\(rerunfilecheck\).*Rerun|Please rerun/
 
     # Extracts everything the log says is missing. Exposed for testing.
@@ -39,6 +40,8 @@ module Pomtex::Engine
         end
       end
       log.scan(FONTSPEC_FONT) { |m| found << Missing.new(Missing::Kind::Font, m[1]) }
+      # babel reports a missing language definition as an unknown option.
+      log.scan(BABEL_LANGUAGE) { |m| found << Missing.new(Missing::Kind::File, "#{m[1]}.ldf") }
       found.uniq
     end
 
