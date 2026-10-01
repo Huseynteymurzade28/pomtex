@@ -51,6 +51,7 @@ independent seeds. The CLI output uses the same terms:
 - **Parallel downloads.** Packages download concurrently on Crystal fibers and are unpacked while the rest are still downloading.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
 - **Font handling.** OpenType fonts are resolved by family name and made visible to XeTeX through a generated fontconfig file. Type 1 map files are passed to pdfTeX automatically.
+- **Safe to run concurrently.** Several pomtex processes can share the cache, for example `pomtex watch` in one terminal and `pomtex build` in another. Writes take an exclusive lock and compiles take a shared one, so a process that waits reuses whatever the other one just installed.
 - **Watch mode.** Recompiles on save, with debouncing, and tracks every input file.
 - **Single binary.** About 3 MB dynamically linked, or about 8 MB fully static.
 
