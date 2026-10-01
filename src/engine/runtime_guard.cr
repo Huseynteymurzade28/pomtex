@@ -116,8 +116,10 @@ module Pomtex::Engine
       font_names = fonts.to_a.uniq
       return 0 if wanted.empty? && font_names.empty?
 
-      present = toolchain.locate(wanted, env)
-      absent = wanted.reject { |file| present.includes?(file) }
+      present = toolchain.locate(wanted + wanted.flat_map { |file| Seed::Resolver.alternates(file) }, env)
+      absent = wanted.reject do |file|
+        present.includes?(file) || Seed::Resolver.alternates(file).any? { |alt| present.includes?(alt) }
+      end
       unless font_names.empty?
         # Fonts available via fontconfig are fine for XeTeX; we only fill gaps from CTAN.
         font_names.each do |font|

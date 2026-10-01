@@ -90,6 +90,13 @@ describe Pomtex::Seed::Resolver do
     resolver.closure(["tikz-cd"]) { |layer| layer.reject { |pkg| pkg.name == "tikz-cd" } }.should be_empty
   end
 
+  it "accepts pgf-level libraries for tikz library requests" do
+    Pomtex::Seed::Resolver.alternates("tikzlibraryarrows.meta.code.tex").should eq ["pgflibraryarrows.meta.code.tex"]
+    Pomtex::Seed::Resolver.alternates("tikz.sty").should be_empty
+    index = Pomtex::Seed::Index.from_tlpdb(IO::Memory.new("name pgf\nrunfiles size=1\n RELOC/tex/generic/pgf/libraries/pgflibraryarrows.meta.code.tex\n\n"))
+    Pomtex::Seed::Resolver.new(index).package_for("tikzlibraryarrows.meta.code.tex").should eq "pgf"
+  end
+
   it "falls back to seed hints without an index" do
     Pomtex::Seed::Resolver.new(nil).package_for("tikz.sty").should eq "pgf"
   end

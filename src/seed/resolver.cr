@@ -183,8 +183,27 @@ module Pomtex::Seed
       !index.nil?
     end
 
+    # Other names that satisfy a request: \usetikzlibrary{x} falls back to the
+    # pgf-level library when there is no tikz-level one (e.g. arrows.meta).
+    def self.alternates(file : String) : Array(String)
+      if file.starts_with?("tikzlibrary")
+        [file.sub("tikzlibrary", "pgflibrary")]
+      else
+        [] of String
+      end
+    end
+
     # The package that provides `file`, trying `file.tex` for extension-less inputs.
     def package_for(file : String) : String?
+      ([file] + self.class.alternates(file)).each do |name|
+        if pkg = package_for_name(name)
+          return pkg
+        end
+      end
+      nil
+    end
+
+    private def package_for_name(file : String) : String?
       base = File.basename(file)
       if idx = index
         # Like kpathsea, retry with ".tex" (\input{pgf.revision} reads pgf.revision.tex).
