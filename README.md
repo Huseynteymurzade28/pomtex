@@ -45,7 +45,7 @@ independent seeds. The CLI output uses the same terms:
 
 ## Features
 
-- **Static analysis before compiling.** Detects `\documentclass`, `\usepackage`, `\RequirePackage`, `\usetikzlibrary`, `\usepgfplotslibrary`, beamer themes, bibliography styles and fontspec fonts. It follows local `\input`, `\include`, `\subfile` and `\import` chains, and local `.sty` files.
+- **Static analysis before compiling.** Detects `\documentclass`, `\usepackage`, `\RequirePackage`, `\usetikzlibrary`, `\usepgfplotslibrary`, beamer themes, babel languages, bibliography styles and fontspec fonts. It follows local `\input`, `\include`, `\subfile` and `\import` chains, and local `.sty` files.
 - **Runtime recovery.** If the log still reports a missing file (`.sty`, `.cls`, TFM, encoding or map file, or a fontspec font), pomtex installs the package that provides it and compiles again.
 - **Parallel downloads.** Packages download concurrently on Crystal fibers and are unpacked while the rest are still downloading.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
@@ -65,8 +65,8 @@ yay -S pomtex         # build from source
 ### Prebuilt binary
 
 ```sh
-curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.0-linux-x86_64.tar.gz | tar xz
-install -Dm755 pomtex-0.1.0-linux-x86_64/pomtex ~/.local/bin/pomtex
+curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.1-linux-x86_64.tar.gz | tar xz
+install -Dm755 pomtex-0.1.1-linux-x86_64/pomtex ~/.local/bin/pomtex
 ```
 
 The binary is statically linked and runs on any x86_64 Linux distribution.
