@@ -88,7 +88,8 @@ module Pomtex::Seed
     end
 
     private def download(pkg : Package) : Path
-      dest = Config.downloads_dir.join("#{pkg.name}.tar.xz")
+      # Per-process names: two pomtex processes never share an in-flight file.
+      dest = Config.downloads_dir.join("#{pkg.name}.#{Process.pid}.tar.xz")
       self.class.stream(Config.aril_url(pkg.name), dest, pkg.sha512.presence)
       dest
     end
