@@ -67,8 +67,8 @@ yay -S pomtex         # build from source
 ### Prebuilt binary
 
 ```sh
-curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.2-linux-x86_64.tar.gz | tar xz
-install -Dm755 pomtex-0.1.2-linux-x86_64/pomtex ~/.local/bin/pomtex
+curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.3-linux-x86_64.tar.gz | tar xz
+install -Dm755 pomtex-0.1.3-linux-x86_64/pomtex ~/.local/bin/pomtex
 ```
 
 The binary is statically linked and runs on any x86_64 Linux distribution.
