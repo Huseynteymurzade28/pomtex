@@ -1,0 +1,14 @@
+% BibTeX with natbib: pomtex runs bibtex when citations or refs.bib change,
+% then reruns LaTeX until the references settle.
+\documentclass{article}
+\usepackage[numbers]{natbib}
+\usepackage[hidelinks]{hyperref}
+
+\begin{document}
+\section*{Citations with BibTeX}
+\TeX{} was designed by \citet{knuth1984}, and \LaTeX{} builds on it
+\citep{lamport1994}. Information theory begins with \citet{shannon1948}.
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+\end{document}
