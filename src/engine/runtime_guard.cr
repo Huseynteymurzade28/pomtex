@@ -8,6 +8,15 @@ require "../core/cache_lock"
 module Pomtex::Engine
   # Compiles a document, intercepting "file not found" failures on the fly:
   # missing files are resolved to arils, fetched, and the run is retried.
+  # Raised in --offline mode when the document needs arils that are not planted.
+  class OfflineMissing < Error
+    getter packages : Array(String)
+
+    def initialize(@packages)
+      super("offline: missing #{packages.join(", ")} (run without --offline to install)")
+    end
+  end
+
   class RuntimeGuard
     record Missing, kind : Kind, name : String do
       enum Kind
@@ -127,7 +136,6 @@ module Pomtex::Engine
     # sets, and following their conditional loads would over-fetch.
     def prepare(scan : Seed::ScanResult) : Int32
       planted = provision(scan.files, scan.fonts)
-      return planted if offline
 
       graph = Seed::ScanResult.new
       graph.files.concat(scan.files)
@@ -207,10 +215,9 @@ module Pomtex::Engine
       plan = plan(roots.uniq, env)
       return 0 if plan.empty?
 
-      if offline
-        UI.warn "offline: would fetch #{plan.map(&.name).join(", ")}"
-        return 0
-      end
+      # Offline, a missing package is final: stop before running the engine
+      # rather than letting it fail on the same file.
+      raise OfflineMissing.new(plan.map(&.name)) if offline
       fetch(plan)
     end
 

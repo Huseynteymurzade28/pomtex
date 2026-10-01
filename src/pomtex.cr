@@ -182,7 +182,7 @@ module Pomtex
         if plan.empty?
           UI.ok "already present: #{packages.join(", ")}"
         elsif offline
-          UI.warn "offline: would fetch #{plan.map(&.name).join(", ")}"
+          raise Engine::OfflineMissing.new(plan.map(&.name))
         else
           planted += guard.fetch(plan)
         end
