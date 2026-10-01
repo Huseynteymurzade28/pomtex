@@ -11,6 +11,10 @@ module Pomtex::Seed
     property needs_lua = false                        # \directlua, luacode, ...
     getter tcb_libraries = Set(String).new            # tcolorbox libraries: `skins`, `most`, ...
     getter tcb_styles = {} of String => Array(String) # library styles defined by tcolorbox.sty
+    getter assets = [] of Path                        # local non-TeX inputs: graphics, .bib, listings
+    getter asset_refs = [] of Scanner::AssetRef       # unresolved references to those inputs
+    getter graphics_paths = [] of String              # \graphicspath{{fig/}{img/}}
+    property current_dir : Path? = nil                # directory of the file being scanned
 
     # The engine to run when the user did not choose one.
     def suggested_engine : String
@@ -51,6 +55,11 @@ module Pomtex::Seed
 
     OPT = %q{(?:\s*\[[^\]]*\])*\s*}
 
+    # A local file referenced by the document that is not TeX source.
+    record AssetRef, name : String, dir : Path?, graphic : Bool = false
+
+    GRAPHIC_EXTENSIONS = {".pdf", ".png", ".jpg", ".jpeg", ".eps", ".jbig2", ".jb2"}
+
     MAGIC_PROGRAM = /%\s*!\s*TEX\s+(?:TS-)?program\s*=\s*([A-Za-z]+)/i
     PACKAGES      = Regex.new(%q{\\(?:usepackage|RequirePackage|RequirePackageWithOptions)} + OPT + %q<\{([^}]*)\}>)
     CLASSES       = Regex.new(%q{\\(?:documentclass|LoadClass|LoadClassWithOptions)} + OPT + %q<\{([^}]*)\}>)
@@ -69,6 +78,12 @@ module Pomtex::Seed
     FONT_SETTERS  = Regex.new(%q{\\(?:setmainfont|setsansfont|setmonofont|setmathfont|fontspec|newfontfamily\s*\\[A-Za-z@]+|newfontface\s*\\[A-Za-z@]+)} + OPT + %q<\{([^}]*)\}>)
     LUA_MARKERS   = /\\directlua|\\begin\{luacode\*?\}|\\luaexec/
     BABEL         = /\\usepackage\s*\[([^\]]*)\]\s*\{babel\}/
+    GRAPHICS      = Regex.new(%q{\\includegraphics\*?} + OPT + %q<\{([^}]*)\}>)
+    GRAPHICS_PATH = /\\graphicspath\s*\{((?:\s*\{[^}]*\})+)\s*\}/
+    BIBLIOGRAPHY  = /\\bibliography\s*\{([^}]*)\}/
+    BIB_RESOURCE  = Regex.new(%q{\\addbibresource} + OPT + %q<\{([^}]*)\}>)
+    LISTING_INPUT = Regex.new(%q{\\(?:lstinputlisting|verbatiminput|VerbatimInput)} + OPT + %q<\{([^}]*)\}>)
+    MINTED_INPUT  = Regex.new(%q{\\inputminted} + OPT + %q<\{[^}]*\}\s*\{([^}]*)\}>)
 
     # babel package options that are not language names.
     # tcolorbox library styles; their expansion is read from tcolorbox.sty.
@@ -83,6 +98,7 @@ module Pomtex::Seed
       main = Path[path].expand
       raise Error.new("no such file: #{main}") unless File.file?(main)
       visit(main, main.parent, result, Set(String).new)
+      resolve_assets(result, main.parent)
       result
     end
 
@@ -126,6 +142,7 @@ module Pomtex::Seed
         babel_languages(match[1]).each { |lang| result.files << "#{lang}.ldf" }
       end
       result.needs_lua = true if code.matches?(LUA_MARKERS)
+      scan_assets(code, result, keep)
 
       inputs = [] of String
       code.scan(INPUTS) { |match| inputs << match[1].strip if keep.call(match) }
@@ -145,6 +162,58 @@ module Pomtex::Seed
       end
       result.files.concat(result.tcb_library_files)
       result
+    end
+
+    private def scan_assets(code : String, result : ScanResult, keep : Regex::MatchData -> Bool) : Nil
+      dir = result.current_dir
+      code.scan(GRAPHICS_PATH) do |match|
+        match[1].scan(/\{([^}]*)\}/) { |path| result.graphics_paths << path[1].strip }
+      end
+      code.scan(GRAPHICS) do |match|
+        name = match[1].strip
+        result.asset_refs << AssetRef.new(name, dir, graphic: true) if keep.call(match) && plain?(name)
+      end
+      code.scan(BIBLIOGRAPHY) do |match|
+        next unless keep.call(match)
+        split_names(match[1]).each do |name|
+          result.asset_refs << AssetRef.new(name.ends_with?(".bib") ? name : "#{name}.bib", dir)
+        end
+      end
+      {BIB_RESOURCE, LISTING_INPUT, MINTED_INPUT}.each do |pattern|
+        code.scan(pattern) do |match|
+          name = match[1].strip
+          result.asset_refs << AssetRef.new(name, dir) if keep.call(match) && plain?(name)
+        end
+      end
+    end
+
+    # Resolves asset references the way LaTeX would: relative to the including
+    # file, then the project root, then every \graphicspath entry for graphics.
+    def resolve_assets(result : ScanResult, root : Path) : Nil
+      result.asset_refs.each do |ref|
+        bases = [ref.dir, root].compact.uniq
+        if ref.graphic
+          bases += result.graphics_paths.flat_map { |prefix| [ref.dir, root].compact.map(&.join(prefix)) }
+        end
+        names = ref.graphic && File.extname(ref.name).empty? ? GRAPHIC_EXTENSIONS.map { |ext| ref.name + ext } : [ref.name]
+        if (found = first_file(bases.uniq, names)) && !result.assets.includes?(found)
+          result.assets << found
+        end
+      end
+    end
+
+    private def first_file(bases : Array(Path), names : Enumerable(String)) : Path?
+      bases.each do |base|
+        names.each do |name|
+          path = Path[name].absolute? ? Path[name] : base.join(name).expand
+          return path if File.file?(path)
+        end
+      end
+      nil
+    end
+
+    private def plain?(name : String) : Bool
+      !name.empty? && !name.includes?('\\') && !name.includes?('#')
     end
 
     # Brace nesting depth at every character (escaped braces do not count).
@@ -197,6 +266,7 @@ module Pomtex::Seed
     private def visit(file : Path, root : Path, result : ScanResult, seen : Set(String)) : Nil
       return unless seen.add?(file.to_s)
       result.sources << file
+      result.current_dir = file.parent
       text = File.read(file).scrub
       followups = [] of Path
       scan_source(text, result) do |name|
@@ -211,7 +281,7 @@ module Pomtex::Seed
     # project root (LaTeX resolves against the working directory).
     private def resolve_local(name : String, dir : Path, root : Path) : Path?
       {dir, root}.each do |base|
-        candidate = base.join(name).expand
+        candidate = Path[name].absolute? ? Path[name] : base.join(name).expand
         return candidate if File.file?(candidate)
       end
       nil

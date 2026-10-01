@@ -47,6 +47,7 @@ module Pomtex
     property all = false
     property debounce = Config::DEFAULT_DEBOUNCE
     property args = [] of String
+    @recorded = [] of Path
 
     def run(argv : Array(String)) : Int32
       UI.setup
@@ -137,7 +138,7 @@ module Pomtex
       end
       Watcher::LivePulse.new(debounce) do
         compile(file)
-        rescan_sources(file)
+        watch_list(file)
       end.run
     end
 
@@ -313,6 +314,7 @@ module Pomtex
       started = Pomtex.clock
       result = guard.compile(runner, scan, stream)
       elapsed = UI.duration(Pomtex.clock - started)
+      @recorded = runner.recorded_inputs
 
       if result.success && (pdf = result.pdf)
         pages = result.log.match(/Output written on .*?\((\d+) pages?/).try(&.[1])
@@ -328,10 +330,22 @@ module Pomtex
       false
     end
 
-    private def rescan_sources(file : String) : Array(Path)
-      Seed::Scanner.scan(file).sources
+    # Everything `watch` should react to: the scanned sources and assets, plus
+    # every project file the last run actually read (from the -recorder log).
+    # Files outside the project (TeX trees, the pomtex cache) are not watched.
+    private def watch_list(file : String) : Array(Path)
+      root = Path[file].expand.parent
+      scan = Seed::Scanner.scan(file)
+      recorded = @recorded.select { |path| inside?(path, root) && !inside?(path, Config.cache_root) && File.file?(path) }
+      list = (scan.sources + scan.assets + recorded).uniq
+      UI.debug "watching: #{list.map(&.relative_to(root)).join(", ")}"
+      list
     rescue
       [Path[file].expand]
+    end
+
+    private def inside?(path : Path, dir : Path) : Bool
+      path.to_s.starts_with?(dir.to_s.rchop('/') + "/")
     end
   end
 end

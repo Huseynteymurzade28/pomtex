@@ -32,6 +32,41 @@ module Pomtex::Engine
       outdir.join("#{jobname}.log")
     end
 
+    # The -recorder log: every file the engine read or wrote.
+    def fls_path : Path
+      outdir.join("#{jobname}.fls")
+    end
+
+    # Files the last run read, from the -recorder log.
+    def recorded_inputs : Array(Path)
+      File.exists?(fls_path) ? self.class.recorded_inputs(File.read(fls_path).scrub) : [] of Path
+    end
+
+    # Parses a .fls file into the files that were read but not written. Files
+    # the job writes and reads back (.aux, .toc, .out, ...) change on every run;
+    # watching them would trigger rebuilds forever.
+    def self.recorded_inputs(fls : String) : Array(Path)
+      pwd = Path["."]
+      inputs = [] of Path
+      outputs = Set(Path).new
+      fls.each_line(chomp: true) do |line|
+        kind, _, file = line.partition(' ')
+        next if file.empty?
+        case kind
+        when "PWD"    then pwd = Path[file]
+        when "INPUT"  then inputs << absolute(pwd, file)
+        when "OUTPUT" then outputs << absolute(pwd, file)
+        end
+      end
+      inputs.uniq.reject { |path| outputs.includes?(path) }
+    end
+
+    # Path#join appends even absolute paths, so absolute entries are kept as-is.
+    private def self.absolute(base : Path, file : String) : Path
+      path = Path[file]
+      (path.absolute? ? path : base.join(path)).normalize
+    end
+
     # Environment for every TeX subprocess (engines and kpsewhich alike).
     #
     # TEXINPUTS gets the aril tree prepended and a trailing ':' so kpathsea still
@@ -97,6 +132,7 @@ module Pomtex::Engine
         "-interaction=nonstopmode",
         "-halt-on-error",
         "-file-line-error",
+        "-recorder",
         "-jobname=#{jobname}",
         "-output-directory=#{outdir}",
       ]

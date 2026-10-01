@@ -37,3 +37,23 @@ describe Pomtex::Engine::RuntimeGuard do
     Guard.error_excerpt(log, 2).should eq "./main.tex:4: Undefined control sequence.\nl.4 \\foo"
   end
 end
+
+describe Pomtex::Engine::Runner do
+  it "reads inputs from the -recorder log, minus files the job also writes" do
+    fls = <<-FLS
+      PWD /home/u/thesis
+      INPUT /opt/tex/texmf-dist/tex/latex/base/article.cls
+      INPUT ./thesis.tex
+      INPUT thesis.tex
+      INPUT ./fig/logo.pdf
+      INPUT /home/u/thesis/build/thesis.aux
+      OUTPUT /home/u/thesis/build/thesis.aux
+      OUTPUT /home/u/thesis/build/thesis.log
+      FLS
+    Pomtex::Engine::Runner.recorded_inputs(fls).map(&.to_s).should eq [
+      "/opt/tex/texmf-dist/tex/latex/base/article.cls",
+      "/home/u/thesis/thesis.tex",
+      "/home/u/thesis/fig/logo.pdf",
+    ]
+  end
+end
