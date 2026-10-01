@@ -10,7 +10,7 @@ require "path"
 #     index/        the file -> package index built from texlive.tlpdb
 #     arils/        one manifest per installed aril
 module Pomtex
-  VERSION = "0.1.3"
+  VERSION = "0.2.0"
 
   module Config
     extend self
