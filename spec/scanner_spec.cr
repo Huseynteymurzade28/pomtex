@@ -94,3 +94,37 @@ describe Pomtex::Seed::Scanner do
     end
   end
 end
+
+describe "Pomtex::Seed::Scanner assets" do
+  it "resolves graphics, bibliographies and listings like LaTeX does" do
+    with_tmpdir do |dir|
+      Dir.mkdir_p(dir.join("fig"))
+      Dir.mkdir_p(dir.join("chapters"))
+      Dir.mkdir_p(dir.join("code"))
+      File.write(dir.join("main.tex"), <<-'TEX')
+        \documentclass{article}
+        \usepackage{graphicx}
+        \graphicspath{{fig/}{img/}}
+        \begin{document}
+        \includegraphics[width=3cm]{logo}
+        \input{chapters/one}
+        \bibliography{refs,extra}
+        \lstinputlisting[language=C]{code/main.c}
+        \includegraphics{\jobname-missing}
+        % \includegraphics{commented}
+        \end{document}
+        TEX
+      File.write(dir.join("chapters", "one.tex"), "\\includegraphics{plot.png}\n\\addbibresource{chapters/more.bib}")
+      File.write(dir.join("fig", "logo.pdf"), "")
+      File.write(dir.join("chapters", "plot.png"), "")
+      File.write(dir.join("refs.bib"), "")
+      File.write(dir.join("chapters", "more.bib"), "")
+      File.write(dir.join("code", "main.c"), "")
+      File.write(dir.join("commented.png"), "")
+
+      assets = Pomtex::Seed::Scanner.scan(dir.join("main.tex")).assets.map(&.relative_to(dir).to_s)
+      # extra.bib does not exist, so it is not watched
+      assets.sort.should eq ["chapters/more.bib", "chapters/plot.png", "code/main.c", "fig/logo.pdf", "refs.bib"]
+    end
+  end
+end

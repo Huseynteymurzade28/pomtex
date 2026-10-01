@@ -52,7 +52,7 @@ independent seeds. The CLI output uses the same terms:
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
 - **Font handling.** OpenType fonts are resolved by family name and made visible to XeTeX through a generated fontconfig file. Type 1 map files are passed to pdfTeX automatically.
 - **Safe to run concurrently.** Several pomtex processes can share the cache, for example `pomtex watch` in one terminal and `pomtex build` in another. Writes take an exclusive lock and compiles take a shared one, so a process that waits reuses whatever the other one just installed.
-- **Watch mode.** Recompiles on save, with debouncing, and tracks every input file.
+- **Watch mode.** Recompiles on save, with debouncing. It watches every project file the engine actually read (from the `-recorder` log), plus graphics, bibliographies and listings found by the scanner, so it keeps working even when a compile fails part-way.
 - **Single binary.** About 3 MB dynamically linked, or about 8 MB fully static.
 
 ## Installation
@@ -161,7 +161,7 @@ Packages loaded through macros are caught at runtime:
 ### Live preview
 
 ```sh
-pomtex watch thesis.tex       # recompiles whenever thesis.tex or any input file changes
+pomtex watch thesis.tex       # recompiles when any .tex, figure, .bib or listing changes
 ```
 
 Use it with a PDF viewer that reloads automatically, such as Zathura, Okular or Evince.

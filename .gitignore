@@ -6,6 +6,7 @@ lib/
 # LaTeX build output from examples
 examples/**/*.aux
 examples/**/*.log
+examples/**/*.fls
 examples/**/*.out
 examples/**/*.toc
 examples/**/*.nav
