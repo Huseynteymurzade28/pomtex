@@ -36,7 +36,12 @@ module Pomtex::Core
     # Asks kpathsea which of `files` it can already see (with the aril tree mounted
     # through `env`). Returns the subset of names that resolved.
     def locate(files : Enumerable(String), env : Hash(String, String)) : Set(String)
-      found = Set(String).new
+      lookup(files, env).keys.to_set
+    end
+
+    # Like `locate`, but maps each name kpathsea resolved to its full path.
+    def lookup(files : Enumerable(String), env : Hash(String, String)) : Hash(String, String)
+      found = {} of String => String
       names = files.to_a.uniq
       return found if names.empty?
 
@@ -47,9 +52,8 @@ module Pomtex::Core
           path = line.strip
           next if path.empty?
           base = File.basename(path)
-          found << base
           # `\input{chapter}` asks for "chapter" but kpathsea answers with chapter.tex.
-          found << File.basename(path, ".tex") if base.ends_with?(".tex")
+          slice.each { |name| found[name] ||= path if name == base || "#{name}.tex" == base }
         end
       end
       found

@@ -46,6 +46,7 @@ independent seeds. The CLI output uses the same terms:
 ## Features
 
 - **Static analysis before compiling.** Detects `\documentclass`, `\usepackage`, `\RequirePackage`, `\usetikzlibrary`, `\usepgfplotslibrary`, beamer themes, babel languages, bibliography styles and fontspec fonts. It follows local `\input`, `\include`, `\subfile` and `\import` chains, and local `.sty` files.
+- **Load-graph prefetching.** Packages often load other packages that TeX Live's metadata does not list as dependencies (for example, tcolorbox's `skins` library needs `tikzfill`). pomtex reads the newly installed packages, follows the files they load unconditionally, and installs everything in parallel batches before the first compile.
 - **Runtime recovery.** If the log still reports a missing file (`.sty`, `.cls`, TFM, encoding or map file, or a fontspec font), pomtex installs the package that provides it and compiles again.
 - **Parallel downloads.** Packages download concurrently on Crystal fibers and are unpacked while the rest are still downloading.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
@@ -65,8 +66,8 @@ yay -S pomtex         # build from source
 ### Prebuilt binary
 
 ```sh
-curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.1-linux-x86_64.tar.gz | tar xz
-install -Dm755 pomtex-0.1.1-linux-x86_64/pomtex ~/.local/bin/pomtex
+curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.1.2-linux-x86_64.tar.gz | tar xz
+install -Dm755 pomtex-0.1.2-linux-x86_64/pomtex ~/.local/bin/pomtex
 ```
 
 The binary is statically linked and runs on any x86_64 Linux distribution.
@@ -223,7 +224,7 @@ flowchart LR
 
 1. **Detection.** Use the system `pdflatex` and `kpsewhich` if present. Otherwise use the pomtex kernel, downloading it first if necessary (TinyTeX-1, about 51 MB).
 2. **Scanning.** Parse the document and every local file it includes, with comments removed.
-3. **Resolution.** The first time something is missing, pomtex downloads `texlive.tlpdb` (2.7 MB) and builds an index of about 185,000 files across 4,900 packages. It maps each missing file to a package, then checks that package's dependencies layer by layer with batched `kpsewhich` calls.
+3. **Resolution.** The first time something is missing, pomtex downloads `texlive.tlpdb` (2.7 MB) and builds an index of about 185,000 files across 4,900 packages. It maps each missing file to a package, then checks that package's dependencies layer by layer with batched `kpsewhich` calls. It then scans the newly installed package files and follows their top-level `\RequirePackage`, `\input` and library loads until nothing new turns up. Loads nested inside braces are skipped because they are usually conditional.
 4. **Download and unpack.** `tlnet/archive/<package>.tar.xz` is streamed and its SHA-512 verified. It is then unpacked by a built-in tar reader that rejects path traversal.
 5. **Compilation.** The engine runs with the package tree added to its search paths (`TEXINPUTS`, `TEXMFAUXTREES`). It also gets a fontconfig file for XeTeX and the font map files needed by pdfTeX.
 6. **Recovery.** pomtex reads the log, installs any packages that are still missing and compiles again, for up to 8 rounds. It reruns for cross-references for up to 3 passes.
