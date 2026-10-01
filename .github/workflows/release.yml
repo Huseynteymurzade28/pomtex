@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  static-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check that the tag matches the version
+        run: |
+          shard="v$(awk '/^version:/ {print $2; exit}' shard.yml)"
+          code="v$(sed -n 's/.*VERSION = "\(.*\)"/\1/p' src/config.cr)"
+          echo "tag=$GITHUB_REF_NAME shard.yml=$shard config.cr=$code"
+          test "$shard" = "$GITHUB_REF_NAME" && test "$code" = "$GITHUB_REF_NAME"
+
+      - name: Build static binary (Alpine, musl)
+        run: make static
+
+      - name: Package
+        run: |
+          name="pomtex-${GITHUB_REF_NAME#v}-linux-x86_64"
+          mkdir -p "dist/$name"
+          cp bin/pomtex README.md LICENSE "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+          (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+          cat dist/*.sha256
+
+      - name: Smoke test
+        run: |
+          file dist/pomtex-*/pomtex
+          dist/pomtex-*/pomtex --version
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 \
+            --title "pomtex $GITHUB_REF_NAME" --generate-notes
