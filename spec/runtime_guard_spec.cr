@@ -57,3 +57,11 @@ describe Pomtex::Engine::Runner do
     ]
   end
 end
+
+describe Pomtex::Engine::OfflineMissing do
+  it "names every missing package in one message" do
+    error = Pomtex::Engine::OfflineMissing.new(["mhchem", "chemgreek"])
+    error.message.should eq "offline: missing mhchem, chemgreek (run without --offline to install)"
+    error.should be_a(Pomtex::Error)
+  end
+end
