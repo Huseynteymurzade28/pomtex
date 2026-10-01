@@ -3,12 +3,14 @@ require "../config"
 module Pomtex::Seed
   # What a document needs before it can be compiled.
   class ScanResult
-    getter files = Set(String).new  # TeX-side files: foo.sty, bar.cls, tikzlibraryx.code.tex, ...
-    getter fonts = Set(String).new  # fontspec font names
-    getter sources = [] of Path     # local files that were scanned
-    property engine : String? = nil # explicit `% !TEX program = ...`
-    property needs_unicode = false  # fontspec & friends
-    property needs_lua = false      # \directlua, luacode, ...
+    getter files = Set(String).new                    # TeX-side files: foo.sty, bar.cls, tikzlibraryx.code.tex, ...
+    getter fonts = Set(String).new                    # fontspec font names
+    getter sources = [] of Path                       # local files that were scanned
+    property engine : String? = nil                   # explicit `% !TEX program = ...`
+    property needs_unicode = false                    # fontspec & friends
+    property needs_lua = false                        # \directlua, luacode, ...
+    getter tcb_libraries = Set(String).new            # tcolorbox libraries: `skins`, `most`, ...
+    getter tcb_styles = {} of String => Array(String) # library styles defined by tcolorbox.sty
 
     # The engine to run when the user did not choose one.
     def suggested_engine : String
@@ -22,6 +24,23 @@ module Pomtex::Seed
 
     def packages : Array(String)
       files.select(&.ends_with?(".sty")).map(&.rchop(".sty")).sort!
+    end
+
+    # Library files for the requested tcolorbox libraries. Styles such as `most`
+    # expand to other libraries once tcolorbox.sty (which defines them) is scanned.
+    def tcb_library_files : Set(String)
+      result = Set(String).new
+      seen = Set(String).new
+      pending = tcb_libraries.to_a
+      while library = pending.pop?
+        next unless seen.add?(library)
+        if expansion = tcb_styles[library]?
+          pending.concat(expansion)
+        elsif !Scanner::TCB_STYLE_NAMES.includes?(library)
+          result << "tcb#{library}.code.tex"
+        end
+      end
+      result
     end
   end
 
@@ -40,7 +59,10 @@ module Pomtex::Seed
     PGF_LIBS      = /\\usepgflibrary\s*\{([^}]*)\}/
     PGFPLOTS_LIBS = /\\usepgfplotslibrary\s*\{([^}]*)\}/
     TCB_LIBS      = /\\tcbuselibrary\s*\{([^}]*)\}/
-    INPUTS        = /\\(?:input|include|subfile|InputIfFileExists)\s*\{([^}]*)\}/
+    TCB_PACKAGE   = /\\(?:usepackage|RequirePackage)\s*\[([^\]]*)\]\s*\{tcolorbox\}/
+    TCB_STYLE     = /\\tcb@add@library@style\s*\{([^}]*)\}\s*\{([^}]*)\}/
+    INPUTS        = /\\(?:input|include|subfile)\s*\{([^}]*)\}/
+    OPTIONAL      = /\\InputIfFileExists\s*\{([^}]*)\}/
     IMPORTS       = /\\(?:sub)?import\*?\s*\{([^}]*)\}\s*\{([^}]*)\}/
     BARE_INPUT    = /\\input\s+([A-Za-z0-9_\-.\/]+)/
     BIB_STYLE     = /\\bibliographystyle\s*\{([^}]*)\}/
@@ -49,6 +71,9 @@ module Pomtex::Seed
     BABEL         = /\\usepackage\s*\[([^\]]*)\]\s*\{babel\}/
 
     # babel package options that are not language names.
+    # tcolorbox library styles; their expansion is read from tcolorbox.sty.
+    TCB_STYLE_NAMES = {"most", "many", "all"}
+
     BABEL_FLAGS = {"activeacute", "activegrave", "base", "bidi", "config", "hyphenmap", "keepshorthandsactive",
                    "layout", "math", "noconfigs", "nocase", "provide", "safe", "shorthands", "showlanguages",
                    "silent", "strings", "headfoot"}
@@ -62,34 +87,50 @@ module Pomtex::Seed
     end
 
     # Scans TeX source text (comments are stripped first). Exposed for testing.
-    def scan_source(text : String, result : ScanResult = ScanResult.new, &local : String -> Path?) : ScanResult
+    #
+    # With `top_level_only`, commands nested inside `{...}` are ignored. Package
+    # code wraps conditional loads in braces (`\gdef\x{\RequirePackage{...}}`,
+    # `\IfPackageLoadedTF{...}{...}`), while unconditional ones sit at the top.
+    def scan_source(text : String, result : ScanResult = ScanResult.new, top_level_only : Bool = false,
+                    &local : String -> Path?) : ScanResult
       if result.engine.nil? && (magic = text.match(MAGIC_PROGRAM))
         result.engine = magic[1].downcase
       end
       code = strip_comments(text)
+      depths = top_level_only ? brace_depths(code) : nil
+      keep = ->(match : Regex::MatchData) { depths.nil? || depths[match.begin]? == 0 }
 
-      each_name(code, PACKAGES) do |name|
+      each_name(code, PACKAGES, keep) do |name|
         result.needs_unicode = true if Config::XETEX_TRIGGERS.includes?(name)
         result.needs_lua = true if name.starts_with?("luatex") || name == "luacode"
         request(result, "#{name}.sty", &local)
       end
-      each_name(code, CLASSES) { |name| request(result, "#{name}.cls", &local) }
+      each_name(code, CLASSES, keep) { |name| request(result, "#{name}.cls", &local) }
       code.scan(THEMES) do |match|
+        next unless keep.call(match)
         split_names(match[2]).each { |name| request(result, "beamer#{match[1]}theme#{name}.sty", &local) }
       end
-      each_name(code, TIKZ_LIBS) { |name| result.files << "tikzlibrary#{name}.code.tex" }
-      each_name(code, PGF_LIBS) { |name| result.files << "pgflibrary#{name}.code.tex" }
-      each_name(code, PGFPLOTS_LIBS) { |name| result.files << "pgfplotslibrary#{name}.code.tex" }
-      each_name(code, TCB_LIBS) { |name| result.files << "tcb#{name}.code.tex" unless {"most", "all", "many"}.includes?(name) }
-      each_name(code, BIB_STYLE) { |name| result.files << "#{name}.bst" }
-      each_name(code, FONT_SETTERS) { |name| result.fonts << name }
-      code.scan(BABEL) { |match| babel_languages(match[1]).each { |lang| result.files << "#{lang}.ldf" } }
+      each_name(code, TIKZ_LIBS, keep) { |name| result.files << "tikzlibrary#{name}.code.tex" }
+      each_name(code, PGF_LIBS, keep) { |name| result.files << "pgflibrary#{name}.code.tex" }
+      each_name(code, PGFPLOTS_LIBS, keep) { |name| result.files << "pgfplotslibrary#{name}.code.tex" }
+      each_name(code, TCB_LIBS, keep) { |name| result.tcb_libraries << name }
+      code.scan(TCB_PACKAGE) do |match|
+        next unless keep.call(match)
+        split_names(match[1]).each { |name| result.tcb_libraries << name unless name.includes?('=') }
+      end
+      code.scan(TCB_STYLE) { |match| result.tcb_styles[match[1].strip] = split_names(match[2]) }
+      each_name(code, BIB_STYLE, keep) { |name| result.files << "#{name}.bst" }
+      each_name(code, FONT_SETTERS, keep) { |name| result.fonts << name }
+      code.scan(BABEL) do |match|
+        next unless keep.call(match)
+        babel_languages(match[1]).each { |lang| result.files << "#{lang}.ldf" }
+      end
       result.needs_lua = true if code.matches?(LUA_MARKERS)
 
       inputs = [] of String
-      code.scan(INPUTS) { |match| inputs << match[1].strip }
-      code.scan(BARE_INPUT) { |match| inputs << match[1] }
-      code.scan(IMPORTS) { |match| inputs << File.join(match[1].strip, match[2].strip) }
+      code.scan(INPUTS) { |match| inputs << match[1].strip if keep.call(match) }
+      code.scan(BARE_INPUT) { |match| inputs << match[1] if keep.call(match) }
+      code.scan(IMPORTS) { |match| inputs << File.join(match[1].strip, match[2].strip) if keep.call(match) }
       inputs.each do |name|
         next if name.empty? || name.includes?('\\') || name.includes?('#')
         candidates = File.extname(name).empty? ? ["#{name}.tex", name] : [name]
@@ -97,7 +138,34 @@ module Pomtex::Seed
           result.files << candidates.first
         end
       end
+      # \InputIfFileExists is optional by definition: follow local files only.
+      code.scan(OPTIONAL) do |match|
+        name = match[1].strip
+        local.call(name) unless name.empty? || name.includes?('\\')
+      end
+      result.files.concat(result.tcb_library_files)
       result
+    end
+
+    # Brace nesting depth at every character (escaped braces do not count).
+    def brace_depths(code : String) : Array(Int32)
+      depths = Array(Int32).new(code.size, 0)
+      depth = 0
+      escaped = false
+      code.each_char_with_index do |char, index|
+        if escaped
+          escaped = false
+        elsif char == '\\'
+          escaped = true
+        elsif char == '{'
+          depth += 1
+        elsif char == '}'
+          depth = Math.max(depth - 1, 0)
+        end
+        # A command's own argument opens after it, so a match starts at its depth.
+        depths[index] = char == '{' ? depth - 1 : depth
+      end
+      depths
     end
 
     # Removes `%` comments while keeping escaped `\%`.
@@ -153,8 +221,11 @@ module Pomtex::Seed
       result.files << file unless local.call(file)
     end
 
-    private def each_name(code : String, pattern : Regex, & : String ->) : Nil
-      code.scan(pattern) { |match| split_names(match[1]).each { |name| yield name } }
+    private def each_name(code : String, pattern : Regex, keep : Regex::MatchData -> Bool, & : String ->) : Nil
+      code.scan(pattern) do |match|
+        next unless keep.call(match)
+        split_names(match[1]).each { |name| yield name }
+      end
     end
 
     # Language names from babel's options: `turkish`, or `main=turkish`.

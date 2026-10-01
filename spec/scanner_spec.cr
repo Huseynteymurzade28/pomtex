@@ -45,6 +45,36 @@ describe Pomtex::Seed::Scanner do
     scan("\\usepackage[safe=none,silent]{babel}").files.should eq Set{"babel.sty"}
   end
 
+  it "expands tcolorbox library styles once tcolorbox.sty defines them" do
+    result = scan("\\usepackage[most]{tcolorbox}\n\\tcbuselibrary{theorems}")
+    result.files.should eq Set{"tcolorbox.sty", "tcbtheorems.code.tex"} # `most` is not known yet
+
+    Pomtex::Seed::Scanner.scan_source(<<-'STY', result) { nil }
+      \tcb@add@library@style{many}{skins,breakable}
+      \tcb@add@library@style{most}{many,listingsutf8}
+      STY
+    result.files.should eq Set{
+      "tcolorbox.sty", "tcbtheorems.code.tex", "tcbskins.code.tex", "tcbbreakable.code.tex", "tcblistingsutf8.code.tex",
+    }
+  end
+
+  it "follows only top-level loads in package code" do
+    source = <<-'STY'
+      \RequirePackage{pdfcol}
+      \ifpdftex
+        \RequirePackage{listingsutf8}[2011/11/10]
+      \fi
+      \gdef\pgfplots@glob@TMPa{\RequirePackage{luatexbase}}%
+      \pgfutil@ifl@t@r\fmtversion{2020/10/01}{\AddToHook{x}{}}{%
+        \RequirePackage{everyshi}
+      }
+      \InputIfFileExists{tcolorbox.cfg}{}{}
+      STY
+    result = Pomtex::Seed::Scanner.scan_source(source, top_level_only: true) { nil }
+    result.files.should eq Set{"pdfcol.sty", "listingsutf8.sty"}
+    Pomtex::Seed::Scanner.scan_source(source) { nil }.files.size.should eq 4
+  end
+
   it "honours the magic program comment and lua markers" do
     scan("% !TEX program = LuaLaTeX\n\\documentclass{article}").suggested_engine.should eq "lualatex"
     scan("\\directlua{tex.print(1)}").suggested_engine.should eq "lualatex"
