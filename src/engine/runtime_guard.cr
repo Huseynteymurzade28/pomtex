@@ -3,6 +3,7 @@ require "../core/detector"
 require "../seed/resolver"
 require "../seed/aril_fetcher"
 require "./runner"
+require "./bibliography"
 require "../core/cache_lock"
 
 module Pomtex::Engine
@@ -97,12 +98,17 @@ module Pomtex::Engine
       attempted = Set(Missing).new
       passes = 0
       rounds = 0
+      bibliography_runs = 0
       loop do
         runner.map_files = Seed::Manifest.map_files
         result = runner.run(stream)
         missing = self.class.missing_from_log(result.log).reject { |item| attempted.includes?(item) }
 
         if result.success && missing.empty?
+          if bibliography_runs < Config::MAX_BIBLIOGRAPHY_RUNS && (tool = Bibliography.pending(runner, result.log))
+            bibliography_runs += 1
+            next if run_bibliography(tool, runner)
+          end
           if self.class.rerun_needed?(result.log) && passes < Config::MAX_RERUN_PASSES
             passes += 1
             UI.info "rerunning for cross-references (pass #{passes + 1})"
@@ -124,6 +130,51 @@ module Pomtex::Engine
         # Nothing new could be planted: retrying would fail the same way.
         return result if planted == 0
       end
+    end
+
+    # Runs BibTeX/Biber. Returns true when the engine should run again.
+    private def run_bibliography(tool : Bibliography::Tool, runner : Runner) : Bool
+      executable = tool_path(tool.command)
+      unless executable
+        UI.warn "#{tool.command} is not available; citations will be missing"
+        return false
+      end
+      UI.step "Running #{tool.command}"
+      started = Pomtex.clock
+      outcome = Bibliography.run(tool, executable, runner)
+
+      # A missing .bst is just another aril: plant it and try once more.
+      styles = tool.bibtex? && !outcome.success ? Bibliography.missing_styles(outcome.log) : [] of String
+      if !styles.empty? && provision(styles) > 0
+        outcome = Bibliography.run(tool, executable, runner)
+      end
+
+      if outcome.success
+        UI.ok "#{tool.command} in #{UI.duration(Pomtex.clock - started)}"
+      else
+        UI.warn "#{tool.command} failed; citations may be missing\n#{Bibliography.error_excerpt(outcome.log).gsub(/^/m, "    ")}"
+      end
+      outcome.success
+    end
+
+    # Finds a helper program such as biber, planting its binary aril if needed.
+    # With the rind, a biber from $PATH is not trusted: biber must match the
+    # biblatex version, and the planted one comes from the same TeX Live release.
+    def tool_path(name : String) : String?
+      if found = toolchain.executable(name)
+        return found
+      end
+      planted = Config.aril_bin_dir.join(name)
+      return planted.to_s if File::Info.executable?(planted)
+      if toolchain.origin.system? && (found = Process.find_executable(name))
+        return found
+      end
+
+      package = resolver.package("#{name}.#{Config::PLATFORM}")
+      return nil unless package
+      raise OfflineMissing.new([package.name]) if offline
+      fetch([package])
+      File::Info.executable?(planted) ? planted.to_s : nil
     end
 
     # Provisions what the document asks for, then follows the load graph through
