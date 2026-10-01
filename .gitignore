@@ -2,3 +2,12 @@ bin/
 .crystal/
 lib/
 *.dwarf
+
+# LaTeX build output from examples
+examples/**/*.aux
+examples/**/*.log
+examples/**/*.out
+examples/**/*.toc
+examples/**/*.nav
+examples/**/*.snm
+examples/**/*.pdf

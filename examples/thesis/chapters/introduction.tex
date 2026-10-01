@@ -1,0 +1,9 @@
+\chapter{Introduction}\label{ch:intro}
+This chapter lives in its own file. pomtex follows \verb|\input| chains and
+local \texttt{.sty} files, so \texttt{setspace}, \texttt{enumitem} and
+\texttt{cleveref}, required only inside \texttt{thesisstyle.sty}, are found
+before the first run. Results follow in \cref{ch:results}.
+\begin{itemize}
+  \item Scanning is static and fast.
+  \item Missing packages are fetched in parallel.
+\end{itemize}

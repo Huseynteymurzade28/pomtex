@@ -1,0 +1,19 @@
+% XeLaTeX is selected automatically because fontspec is loaded.
+\documentclass[12pt]{article}
+\usepackage{fontspec}
+\setmainfont{Libertinus Serif}
+\setsansfont{Fira Sans}
+\setmonofont{Libertinus Mono}
+
+\begin{document}
+\section*{OpenType fonts by name}
+This text is set in Libertinus Serif. pomtex looks up the font family in the
+TeX Live index, fetches \texttt{libertinus-fonts}, and exposes it to XeTeX
+through fontconfig.
+
+\textsf{Sans serif: Fira Sans, fetched as a second package.}
+
+\texttt{Monospace: Libertinus Mono.}
+
+Unicode works out of the box: Ğüşıöç — Αλφάβητο — Привет.
+\end{document}

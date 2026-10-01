@@ -1,0 +1,30 @@
+\documentclass{beamer}
+\usetheme{Madrid}
+\usecolortheme{beaver}
+\usepackage{tikz}
+
+\title{Slides with pomtex}
+\subtitle{Themes are packages too}
+\author{pomtex examples}
+\date{}
+
+\begin{document}
+\frame{\titlepage}
+
+\begin{frame}{How it works}
+  \begin{enumerate}
+    \item Scan the sources for packages, classes and themes
+    \item Fetch only what is missing
+    \item Compile, and fetch again if the log reports a missing file
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{A picture}
+  \centering
+  \begin{tikzpicture}
+    \draw[thick, fill=red!30] (0,0) circle (1.5);
+    \foreach \a in {0,40,...,320}
+      \fill[red!70!black] (\a:0.9) circle (0.18);
+  \end{tikzpicture}
+\end{frame}
+\end{document}

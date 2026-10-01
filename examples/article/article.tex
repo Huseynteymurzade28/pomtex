@@ -1,0 +1,41 @@
+\documentclass[11pt]{article}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{tikz}
+\usetikzlibrary{cd, arrows.meta}
+\usepackage{hyperref}
+
+\title{An Article with Common Packages}
+\author{pomtex examples}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Diagrams}\label{sec:diagrams}
+Commutative diagrams come from \texttt{tikz-cd}, which pomtex fetches together
+with its dependency \texttt{pgf}:
+\[
+\begin{tikzcd}
+  A \arrow[r, "f"] \arrow[d, "g"'] & B \arrow[d, "h"] \\
+  C \arrow[r, "k"']                 & D
+\end{tikzcd}
+\]
+
+\section{Units and tables}
+As shown in Section~\ref{sec:diagrams}, packages are planted on demand.
+\begin{center}
+\begin{tabular}{lS[table-format=3.2]}
+  \toprule
+  Quantity     & {Value} \\
+  \midrule
+  Speed        & 299.79 \\
+  Acceleration &   9.81 \\
+  \bottomrule
+\end{tabular}
+\end{center}
+The value \qty{9.81}{\metre\per\second\squared} is typeset by \texttt{siunitx}.
+
+\end{document}
