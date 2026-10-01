@@ -85,7 +85,9 @@ module Pomtex::Engine
         XML
       unless File.exists?(conf) && File.read(conf) == xml
         Dir.mkdir_p(conf.parent)
-        File.write(conf, xml)
+        tmp = Path["#{conf}.#{Process.pid}.tmp"]
+        File.write(tmp, xml)
+        File.rename(tmp, conf)
       end
       conf
     end

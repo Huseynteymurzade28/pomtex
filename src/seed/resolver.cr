@@ -1,6 +1,7 @@
 require "../config"
 require "./extractor"
 require "./aril_fetcher"
+require "../core/cache_lock"
 
 module Pomtex::Seed
   # One CTAN/TeX Live package as published in tlnet.
@@ -151,13 +152,18 @@ module Pomtex::Seed
 
     # Loads the cached index, (re)building it from tlnet when missing or stale.
     def self.open(offline : Bool = false, refresh : Bool = false) : Resolver
-      path = Config.index_file
-      cached = refresh ? nil : Index.load(path)
-      fresh = cached && File.info(path).modification_time > Time.utc - Index::MAX_AGE
-      return new(cached) if offline || fresh
+      cached = refresh ? nil : Index.load(Config.index_file)
+      return new(cached) if offline || (cached && fresh?)
 
       begin
-        new(rebuild_index)
+        Core::CacheLock.exclusive do
+          # Another process may have rebuilt it while we waited for the lock.
+          if !refresh && fresh? && (rebuilt = Index.load(Config.index_file))
+            new(rebuilt)
+          else
+            new(rebuild_index)
+          end
+        end
       rescue ex
         raise ex unless cached
         UI.warn "could not refresh the package index (#{ex.message}); using the cached copy"
@@ -165,9 +171,18 @@ module Pomtex::Seed
       end
     end
 
+    def self.fresh? : Bool
+      info = File.info?(Config.index_file)
+      !info.nil? && info.modification_time > Time.utc - Index::MAX_AGE
+    end
+
     def self.rebuild_index : Index
+      Core::CacheLock.exclusive { build_index }
+    end
+
+    private def self.build_index : Index
       Config.ensure_dirs
-      archive = Config.downloads_dir.join("texlive.tlpdb.xz")
+      archive = Config.downloads_dir.join("#{Process.pid}-texlive.tlpdb.xz")
       UI.step "Indexing the orchard (texlive.tlpdb)"
       started = Pomtex.clock
       ArilFetcher.stream(Config.tlpdb_url, archive)
@@ -292,6 +307,10 @@ module Pomtex::Seed
 
     # Deletes an aril's files from the texmf tree, pruning empty directories.
     def remove(name : String) : Bool
+      Core::CacheLock.exclusive { remove_unlocked(name) }
+    end
+
+    private def remove_unlocked(name : String) : Bool
       entry = load(name)
       return false unless entry
       root = Config.texmf_dir

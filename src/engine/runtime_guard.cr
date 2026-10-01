@@ -3,6 +3,7 @@ require "../core/detector"
 require "../seed/resolver"
 require "../seed/aril_fetcher"
 require "./runner"
+require "../core/cache_lock"
 
 module Pomtex::Engine
   # Compiles a document, intercepting "file not found" failures on the fly:
@@ -74,7 +75,14 @@ module Pomtex::Engine
     end
 
     # Compiles `runner`'s document. Returns the final result (successful or not).
+    #
+    # The whole compile holds a shared cache lock, so `pomtex clean` in another
+    # terminal cannot remove files mid-build; fetches upgrade it to exclusive.
     def compile(runner : Runner, scan : Seed::ScanResult? = nil, stream : Bool = false) : Runner::Result
+      Core::CacheLock.shared { compile_locked(runner, scan, stream) }
+    end
+
+    private def compile_locked(runner : Runner, scan : Seed::ScanResult?, stream : Bool) : Runner::Result
       prepare(scan) if scan
 
       attempted = Set(Missing).new
@@ -136,7 +144,8 @@ module Pomtex::Engine
         fonts_before = graph.fonts.dup
         toolchain.lookup(pending, env).each_value do |path|
           next unless aril_file?(path)
-          Seed::Scanner.scan_source(File.read(path).scrub, graph, top_level_only: true) { nil }
+          text = File.read(path).scrub rescue next
+          Seed::Scanner.scan_source(text, graph, top_level_only: true) { nil }
         end
         # tcolorbox styles may only now be known; expand them for every request.
         graph.files.concat(graph.tcb_library_files)
@@ -220,6 +229,17 @@ module Pomtex::Engine
     end
 
     def fetch(plan : Array(Seed::Package)) : Int32
+      Core::CacheLock.exclusive do
+        # Another process may have planted some of these while we waited.
+        todo = plan.reject { |pkg| Seed::Manifest.installed?(pkg.name) }
+        if todo.size < plan.size
+          UI.info "already planted by another process: #{(plan - todo).map(&.name).join(", ")}"
+        end
+        todo.empty? ? 0 : fetch_unlocked(todo)
+      end
+    end
+
+    private def fetch_unlocked(plan : Array(Seed::Package)) : Int32
       total = plan.sum(&.size)
       UI.step "Fetching #{plan.size} aril#{plan.size == 1 ? "" : "s"} (#{UI.bytes(total)}) with #{Math.min(jobs, plan.size)} fibers"
       started = Pomtex.clock

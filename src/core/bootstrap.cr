@@ -5,6 +5,7 @@ require "../config"
 require "../seed/aril_fetcher"
 require "../seed/extractor"
 require "./detector"
+require "./cache_lock"
 
 module Pomtex::Core
   # Grows the rind: fetches the portable TinyTeX-1 kernel into ~/.cache/pomtex/rind.
@@ -15,7 +16,10 @@ module Pomtex::Core
       if !force && (toolchain = Detector.rind_toolchain)
         return toolchain
       end
-      install
+      CacheLock.exclusive do
+        # Another process may have grown the rind while we waited for the lock.
+        install if force || !Detector.rind_present?
+      end
       Detector.rind_toolchain || raise Error.new("the rind was unpacked but pdflatex is missing from #{Config.rind_bin_dir}")
     end
 
@@ -23,7 +27,7 @@ module Pomtex::Core
       Config.ensure_dirs
       version = resolve_version
       url = Config.rind_url(version)
-      archive = Config.downloads_dir.join(File.basename(URI.parse(url).path))
+      archive = Config.downloads_dir.join("#{Process.pid}-#{File.basename(URI.parse(url).path)}")
 
       UI.step "Growing the rind (TinyTeX #{version})"
       started = Pomtex.clock
@@ -46,7 +50,7 @@ module Pomtex::Core
     end
 
     def remove : Nil
-      FileUtils.rm_rf(Config.rind_dir)
+      CacheLock.exclusive { FileUtils.rm_rf(Config.rind_dir) }
     end
 
     # The newest TinyTeX release tag, falling back to the pinned one offline.

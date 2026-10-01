@@ -4,6 +4,7 @@ require "./config"
 require "./ui"
 require "./core/detector"
 require "./core/bootstrap"
+require "./core/cache_lock"
 require "./seed/scanner"
 require "./seed/resolver"
 require "./seed/aril_fetcher"
@@ -237,14 +238,16 @@ module Pomtex
     end
 
     private def clean_command : Int32
-      FileUtils.rm_rf(Config.texmf_dir)
-      FileUtils.rm_rf(Config.arils_dir)
-      FileUtils.rm_rf(Config.downloads_dir)
-      UI.ok "removed all arils"
-      if all
-        Core::Bootstrap.remove
-        FileUtils.rm_rf(Config.index_dir)
-        UI.ok "removed the rind and the index"
+      Core::CacheLock.exclusive do
+        FileUtils.rm_rf(Config.texmf_dir)
+        FileUtils.rm_rf(Config.arils_dir)
+        FileUtils.rm_rf(Config.downloads_dir)
+        UI.ok "removed all arils"
+        if all
+          Core::Bootstrap.remove
+          FileUtils.rm_rf(Config.index_dir)
+          UI.ok "removed the rind and the index"
+        end
       end
       0
     end
