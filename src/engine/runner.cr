@@ -63,7 +63,8 @@ module Pomtex::Engine
     end
 
     # XeTeX finds fonts *by name* only through fontconfig, so pomtex keeps its own
-    # fonts.conf: the user's/system configuration plus the aril font directories.
+    # fonts.conf: the user's/system configuration plus the aril and rind font
+    # directories (fontconfig skips directories that do not exist).
     def self.fontconfig_file : Path
       conf = Config.cache_root.join("fonts.conf")
       texmf = Config.texmf_dir
@@ -76,6 +77,8 @@ module Pomtex::Engine
           <include ignore_missing="yes">#{base}</include>
           <dir>#{texmf.join("fonts", "opentype")}</dir>
           <dir>#{texmf.join("fonts", "truetype")}</dir>
+          <dir>#{Config.rind_dir.join("texmf-dist", "fonts", "opentype")}</dir>
+          <dir>#{Config.rind_dir.join("texmf-dist", "fonts", "truetype")}</dir>
           <cachedir>#{Config.cache_root.join("fontconfig")}</cachedir>
         </fontconfig>
 
