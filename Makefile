@@ -26,8 +26,9 @@ release: $(SOURCES)
 static:
 	@mkdir -p bin
 	docker run --rm -v $(CURDIR):/src -w /src $(STATIC_IMAGE) \
-	  sh -c 'apk add --no-cache openssl-libs-static zlib-static xz-static && \
-	         crystal build src/pomtex.cr -o $(BIN) --release --no-debug --static'
+	  sh -c 'apk add --no-cache openssl-libs-static zlib-static && \
+	         crystal build src/pomtex.cr -o $(BIN) --release --no-debug --static && \
+	         strip $(BIN) && chown $(shell id -u):$(shell id -g) $(BIN)'
 	@file $(BIN) 2>/dev/null || true
 
 # Static build without Docker; only works on a musl host such as Alpine.
