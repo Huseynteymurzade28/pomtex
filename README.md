@@ -49,6 +49,7 @@ independent seeds. The CLI output uses the same terms:
 - **Load-graph prefetching.** Packages often load other packages that TeX Live's metadata does not list as dependencies (for example, tcolorbox's `skins` library needs `tikzfill`). pomtex reads the newly installed packages, follows the files they load unconditionally, and installs everything in parallel batches before the first compile.
 - **Runtime recovery.** If the log still reports a missing file (`.sty`, `.cls`, TFM, encoding or map file, or a fontspec font), pomtex installs the package that provides it and compiles again.
 - **Parallel downloads.** Packages download concurrently on Crystal fibers and are unpacked while the rest are still downloading.
+- **Bibliographies.** Runs BibTeX or Biber when the citations, the `.bib` files or the `.bbl` change, then reruns LaTeX until the references settle. Biber is installed from TeX Live on first use, so it always matches the installed biblatex. Missing `.bst` styles are installed like any other package.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
 - **Font handling.** OpenType fonts are resolved by family name and made visible to XeTeX through a generated fontconfig file. Type 1 map files are passed to pdfTeX automatically.
 - **Safe to run concurrently.** Several pomtex processes can share the cache, for example `pomtex watch` in one terminal and `pomtex build` in another. Writes take an exclusive lock and compiles take a shared one, so a process that waits reuses whatever the other one just installed.
@@ -98,6 +99,8 @@ The [`examples/`](examples) directory contains documents that you can compile di
 | [`fonts/fonts.tex`](examples/fonts/fonts.tex) | Automatic XeLaTeX selection, OpenType fonts fetched by family name |
 | [`beamer/slides.tex`](examples/beamer/slides.tex) | Beamer class and themes installed on demand |
 | [`thesis/thesis.tex`](examples/thesis/thesis.tex) | Multi-file project, local style file, cross-references across chapters |
+| [`bibtex/paper.tex`](examples/bibtex/paper.tex) | BibTeX with natbib; BibTeX runs only when citations or `refs.bib` change |
+| [`biblatex/paper.tex`](examples/biblatex/paper.tex) | biblatex with Biber; the `biber` binary is installed on first use |
 
 ```sh
 pomtex build examples/article/article.tex
@@ -156,6 +159,24 @@ Packages loaded through macros are caught at runtime:
 ● Fetching 1 aril (122KB) with 1 fibers
   ✓ lipsum                      122KB  360ms
   ✓ hidden.pdf (1 page) in 2.0s
+```
+
+### Bibliographies
+
+```console
+$ pomtex build examples/biblatex/paper.tex
+● Compiling paper.tex with pdflatex (rind TeX)
+● Fetching 1 aril (24.7MB) with 1 fibers
+  ✓ biber.x86_64-linux         24.7MB  11.4s
+  ✓ 1/1 planted in 11.4s
+● Running biber
+  ✓ biber in 2.8s
+  rerunning for cross-references (pass 2)
+  ✓ paper.pdf (1 page) in 23.1s
+
+$ pomtex build examples/biblatex/paper.tex     # nothing changed: Biber is skipped
+● Compiling paper.tex with pdflatex (rind TeX)
+  ✓ paper.pdf (1 page) in 486ms
 ```
 
 ### Live preview
@@ -228,7 +249,8 @@ flowchart LR
 3. **Resolution.** The first time something is missing, pomtex downloads `texlive.tlpdb` (2.7 MB) and builds an index of about 185,000 files across 4,900 packages. It maps each missing file to a package, then checks that package's dependencies layer by layer with batched `kpsewhich` calls. It then scans the newly installed package files and follows their top-level `\RequirePackage`, `\input` and library loads until nothing new turns up. Loads nested inside braces are skipped because they are usually conditional.
 4. **Download and unpack.** `tlnet/archive/<package>.tar.xz` is streamed and its SHA-512 verified. It is then unpacked by a built-in tar reader that rejects path traversal.
 5. **Compilation.** The engine runs with the package tree added to its search paths (`TEXINPUTS`, `TEXMFAUXTREES`). It also gets a fontconfig file for XeTeX and the font map files needed by pdfTeX.
-6. **Recovery.** pomtex reads the log, installs any packages that are still missing and compiles again, for up to 8 rounds. It reruns for cross-references for up to 3 passes.
+6. **Recovery.** pomtex reads the log, installs any packages that are still missing and compiles again, for up to 8 rounds.
+7. **Bibliography and passes.** If the citations, `.bib` files or `.bbl` changed, pomtex runs BibTeX or Biber, then reruns LaTeX for cross-references, up to 3 passes.
 
 Data layout:
 
@@ -269,7 +291,8 @@ src/
 │   └── extractor.cr        streaming tar reader
 ├── engine/
 │   ├── runner.cr           engine invocation and environment
-│   └── runtime_guard.cr    log analysis and recovery
+│   ├── runtime_guard.cr    log analysis and recovery
+│   └── bibliography.cr     BibTeX/Biber detection and runs
 └── watcher/
     └── live_pulse.cr       file watching with debouncing
 ```
@@ -281,7 +304,6 @@ binary and attaches it to a GitHub release.
 ## Limitations
 
 - **The kernel is larger than intended.** TinyTeX-1 is a 51 MB download and about 190 MB unpacked. A smaller pdfTeX-only kernel is planned ([#1](https://github.com/Huseynteymurzade28/pomtex/issues/1)).
-- `bibtex` and `biber` are not run automatically yet ([#2](https://github.com/Huseynteymurzade28/pomtex/issues/2)).
 - Only Linux x86_64 is supported ([#8](https://github.com/Huseynteymurzade28/pomtex/issues/8)).
 - Packages always come from the current TeX Live release. A kernel from an older release may need `pomtex bootstrap --force` after the yearly TeX Live update ([#7](https://github.com/Huseynteymurzade28/pomtex/issues/7)).
 

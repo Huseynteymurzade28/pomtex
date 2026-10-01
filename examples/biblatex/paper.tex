@@ -1,0 +1,14 @@
+% biblatex with the Biber backend: pomtex plants the biber binary from
+% TeX Live on first use and runs it whenever biblatex asks for it.
+\documentclass{article}
+\usepackage[style=authoryear, backend=biber]{biblatex}
+\usepackage[hidelinks]{hyperref}
+\addbibresource{refs.bib}
+
+\begin{document}
+\section*{Citations with biblatex and Biber}
+\TeX{} was designed by \textcite{knuth1984}, and \LaTeX{} builds on it
+\parencite{lamport1994}. Information theory begins with \textcite{shannon1948}.
+
+\printbibliography
+\end{document}

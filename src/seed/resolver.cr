@@ -15,7 +15,7 @@ module Pomtex::Seed
 
   # The file -> package index, built from TeX Live's texlive.tlpdb and cached as TSV.
   class Index
-    FORMAT_TAG = "pomtex-index-v1"
+    FORMAT_TAG = "pomtex-index-v2" # v2: includes this platform's binary packages
     MAX_AGE    = 14.days
 
     getter packages = {} of String => Package

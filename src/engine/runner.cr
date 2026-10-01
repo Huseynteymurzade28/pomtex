@@ -82,7 +82,7 @@ module Pomtex::Engine
         aux = "#{aux}#{user_aux}"
       end
       {
-        "PATH"            => "#{toolchain.bin_dir}:#{ENV["PATH"]? || "/usr/bin:/bin"}",
+        "PATH"            => "#{toolchain.bin_dir}:#{Config.aril_bin_dir}:#{ENV["PATH"]? || "/usr/bin:/bin"}",
         "FONTCONFIG_FILE" => fontconfig_file.to_s,
         "TEXINPUTS"       => inputs,
         "TEXMFAUXTREES"   => aux,

@@ -9,6 +9,7 @@ require "../src/seed/resolver"
 require "../src/seed/extractor"
 require "../src/engine/runner"
 require "../src/engine/runtime_guard"
+require "../src/engine/bibliography"
 
 def with_tmpdir(&)
   dir = Path[Dir.tempdir].join("pomtex-spec-#{Random.new.hex(6)}")

@@ -7,6 +7,10 @@ lib/
 examples/**/*.aux
 examples/**/*.log
 examples/**/*.fls
+examples/**/*.bbl
+examples/**/*.blg
+examples/**/*.bcf
+examples/**/*.run.xml
 examples/**/*.out
 examples/**/*.toc
 examples/**/*.nav
