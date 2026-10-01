@@ -26,11 +26,12 @@ module Pomtex
     RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-x86_64-%s.tar.xz"
     RIND_TOP_DIR          = ".TinyTeX"
 
-    DEFAULT_JOBS      = 6
-    MAX_GUARD_ROUNDS  = 8
-    MAX_RERUN_PASSES  = 3
-    DEFAULT_DEBOUNCE  = 350.milliseconds
-    WATCH_POLL_PERIOD = 200.milliseconds
+    DEFAULT_JOBS        =  6
+    MAX_GUARD_ROUNDS    =  8
+    MAX_RERUN_PASSES    =  3
+    MAX_PREFETCH_ROUNDS = 10
+    DEFAULT_DEBOUNCE    = 350.milliseconds
+    WATCH_POLL_PERIOD   = 200.milliseconds
 
     # Packages that are never worth fetching as arils: meta packages and pure binaries.
     SKIP_PACKAGE_PREFIXES = {"collection-", "scheme-", "texlive.infra", "00texlive"}

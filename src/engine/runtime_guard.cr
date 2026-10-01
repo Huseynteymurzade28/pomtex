@@ -75,9 +75,7 @@ module Pomtex::Engine
 
     # Compiles `runner`'s document. Returns the final result (successful or not).
     def compile(runner : Runner, scan : Seed::ScanResult? = nil, stream : Bool = false) : Runner::Result
-      if scan
-        provision(scan.files, scan.fonts)
-      end
+      prepare(scan) if scan
 
       attempted = Set(Missing).new
       passes = 0
@@ -111,9 +109,58 @@ module Pomtex::Engine
       end
     end
 
+    # Provisions what the document asks for, then follows the load graph through
+    # the arils pomtex planted: their own \RequirePackage, \input, \tcbuselibrary,
+    # ... are fetched in batches before the first engine run. TeX Live's dependency
+    # metadata misses these (e.g. tcolorbox's `skins` library needs tikzfill), and
+    # with -halt-on-error each one would otherwise cost a full compile.
+    #
+    # Only aril files are scanned: the rind and system TeX ship complete dependency
+    # sets, and following their conditional loads would over-fetch.
+    def prepare(scan : Seed::ScanResult) : Int32
+      planted = provision(scan.files, scan.fonts)
+      return planted if offline
+
+      graph = Seed::ScanResult.new
+      graph.files.concat(scan.files)
+      graph.tcb_libraries.concat(scan.tcb_libraries)
+      scanned = Set(String).new
+      env = environment
+
+      Config::MAX_PREFETCH_ROUNDS.times do
+        pending = graph.files.reject { |file| scanned.includes?(file) }
+        break if pending.empty?
+        pending.each { |file| scanned << file }
+
+        before = graph.files.dup
+        fonts_before = graph.fonts.dup
+        toolchain.lookup(pending, env).each_value do |path|
+          next unless aril_file?(path)
+          Seed::Scanner.scan_source(File.read(path).scrub, graph, top_level_only: true) { nil }
+        end
+        # tcolorbox styles may only now be known; expand them for every request.
+        graph.files.concat(graph.tcb_library_files)
+
+        discovered = graph.files - before
+        new_fonts = graph.fonts - fonts_before
+        break if discovered.empty? && new_fonts.empty?
+        UI.debug "load graph: #{discovered.to_a.sort.join(", ")}"
+        planted += provision(discovered, new_fonts, warn_unknown: false)
+      end
+      planted
+    end
+
+    private def aril_file?(path : String) : Bool
+      root = (@aril_root ||= File.realpath(Config.texmf_dir) rescue Config.texmf_dir.to_s)
+      path.starts_with?(root + "/")
+    end
+
+    @aril_root : String? = nil
+
     # Makes `files` (and fonts) visible to kpathsea, fetching arils for whatever
     # is missing. Returns the number of arils planted.
-    def provision(files : Enumerable(String), fonts : Enumerable(String) = [] of String) : Int32
+    def provision(files : Enumerable(String), fonts : Enumerable(String) = [] of String,
+                  warn_unknown : Bool = true) : Int32
       env = environment
       wanted = files.to_a.uniq
       font_names = fonts.to_a.uniq
@@ -140,8 +187,10 @@ module Pomtex::Engine
         if pkg = resolver.package_for(file)
           roots << pkg
           UI.debug "#{file} → #{pkg}"
-        else
+        elsif warn_unknown
           UI.warn "no aril provides #{file}#{resolver.available? ? "" : " (index unavailable)"}"
+        else
+          UI.debug "no aril provides #{file} (optional or engine-specific)"
         end
       end
       return 0 if roots.empty?
