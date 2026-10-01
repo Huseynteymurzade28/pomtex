@@ -1,0 +1,17 @@
+name: pomtex
+version: 0.1.0
+
+description: |
+  The pomegranate-inspired, on-demand LaTeX engine & package resolver.
+  A featherlight TeX kernel (the rind) plus individually fetched CTAN packages (the arils).
+
+authors:
+  - Hüseyn Teymurzade (https://github.com/Huseynteymurzade28)
+
+crystal: ">= 1.10.0"
+
+targets:
+  pomtex:
+    main: src/pomtex.cr
+
+license: MIT
