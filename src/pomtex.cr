@@ -5,6 +5,7 @@ require "./ui"
 require "./core/detector"
 require "./core/bootstrap"
 require "./core/cache_lock"
+require "./core/update_check"
 require "./seed/scanner"
 require "./seed/resolver"
 require "./seed/aril_fetcher"
@@ -86,6 +87,8 @@ module Pomtex
       UI.error ex.message || "failed"
       1
     rescue ex : IO::Error | Socket::Error | File::Error
+      # `pomtex list | head` closes the pipe early; that is not an error.
+      return 0 if ex.os_error == Errno::EPIPE
       UI.error "#{ex.class.name.split("::").last}: #{ex.message}"
       1
     end
@@ -254,7 +257,7 @@ module Pomtex
     end
 
     private def doctor_command : Int32
-      puts "pomtex #{VERSION}"
+      puts "version     #{VERSION} (#{update_status})"
       puts "cache       #{Config.cache_root}"
       puts "mirror      #{Config.mirror}"
       system_tc = Core::Detector.system_toolchain
@@ -275,6 +278,16 @@ module Pomtex
     end
 
     # ── helpers ─────────────────────────────────────────────────────────────
+
+    private def update_status : String
+      return "update check skipped: --offline" if offline
+      result = Core::UpdateCheck.check
+      case result.status
+      when .outdated? then "#{result.latest} available, update with: #{result.hint}"
+      when .current?  then "latest"
+      else                 "could not check for updates"
+      end
+    end
 
     private def source_argument : String
       file = args.first? || raise Error.new("#{command.presence || "build"} needs a .tex file")

@@ -16,6 +16,7 @@ module Pomtex
     extend self
 
     PLATFORM = "x86_64-linux"
+    REPO     = "Huseynteymurzade28/pomtex"
 
     # TeX Live network repository; every aril is `<mirror>/archive/<name>.tar.xz`.
     DEFAULT_MIRROR = "https://mirror.ctan.org/systems/texlive/tlnet"
