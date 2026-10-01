@@ -10,6 +10,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # install-crystal apt-installs dev libraries; a stale package index 404s.
+      - name: Refresh apt index
+        run: sudo apt-get update -q
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
