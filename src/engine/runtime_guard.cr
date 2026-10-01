@@ -4,6 +4,7 @@ require "../seed/resolver"
 require "../seed/aril_fetcher"
 require "./runner"
 require "./bibliography"
+require "../seed/font_info"
 require "../core/cache_lock"
 
 module Pomtex::Engine
@@ -94,7 +95,48 @@ module Pomtex::Engine
 
     private def compile_locked(runner : Runner, scan : Seed::ScanResult?, stream : Bool) : Runner::Result
       prepare(scan) if scan
+      result = compile_rounds(runner, stream)
+      font_hints(result.log, scan.try(&.sources) || [runner.source]) unless result.success
+      result
+    end
 
+    # fontspec selects fonts by family name, which can differ from the file
+    # name pomtex resolved: "Inconsolata" lives in Inconsolatazi4-Regular.otf,
+    # whose family is "Inconsolatazi4". Name the families that do exist.
+    def font_hints(log : String, sources : Array(Path)) : Nil
+      requested = log.scan(FONTSPEC_FONT).map(&.[1]).uniq
+      return if requested.empty? || !resolver.available?
+      env = environment
+      requested.each do |name|
+        candidates = resolver.font_candidates(name).first(12)
+        paths = toolchain.lookup(candidates, env)
+        families = candidates.compact_map { |file| paths[file]?.try { |path| Seed::FontInfo.family(path) } }.uniq
+        # Spaces matter to XeTeX ("SourceCodePro" is not "Source Code Pro"); case does not.
+        families.reject! { |family| family.downcase == name.strip.downcase }
+        next if families.empty?
+        suggestions = families.map(&.inspect).join(" or ")
+        UI.warn "no font family is called #{name.inspect}; the installed files provide #{suggestions}. " \
+                "Use that name, e.g. #{font_command(sources, name)}{#{families.first}}"
+      end
+    end
+
+    # The command in the user's sources that asked for the font. The log can't
+    # tell: fontspec loads fonts at \begin{document}.
+    def self.font_command(sources : Enumerable(String), name : String) : String
+      pattern = /(\\(?:set(?:main|sans|mono|math)font|fontspec|new(?:fontfamily|fontface)\s*\\[A-Za-z@]+))\s*(?:\[[^\]]*\])?\s*\{\s*#{Regex.escape(name)}\s*\}/
+      sources.each do |text|
+        if match = text.match(pattern)
+          return match[1]
+        end
+      end
+      "\\setmainfont"
+    end
+
+    private def font_command(sources : Array(Path), name : String) : String
+      self.class.font_command(sources.compact_map { |path| File.read(path).scrub rescue nil }, name)
+    end
+
+    private def compile_rounds(runner : Runner, stream : Bool) : Runner::Result
       attempted = Set(Missing).new
       passes = 0
       rounds = 0

@@ -65,3 +65,12 @@ describe Pomtex::Engine::OfflineMissing do
     error.should be_a(Pomtex::Error)
   end
 end
+
+describe "Pomtex::Engine::RuntimeGuard.font_command" do
+  it "quotes the command that requested the font" do
+    guard = Pomtex::Engine::RuntimeGuard
+    guard.font_command(["\\setmonofont{Inconsolata}"], "Inconsolata").should eq "\\setmonofont"
+    guard.font_command(["x", "\\newfontfamily\\code[Scale=0.9]{ Inconsolata }"], "Inconsolata").should eq "\\newfontfamily\\code"
+    guard.font_command(["\\setmainfont{Other}"], "Inconsolata").should eq "\\setmainfont"
+  end
+end
