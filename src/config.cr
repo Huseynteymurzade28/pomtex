@@ -26,12 +26,13 @@ module Pomtex
     RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-x86_64-%s.tar.xz"
     RIND_TOP_DIR          = ".TinyTeX"
 
-    DEFAULT_JOBS        =  6
-    MAX_GUARD_ROUNDS    =  8
-    MAX_RERUN_PASSES    =  3
-    MAX_PREFETCH_ROUNDS = 10
-    DEFAULT_DEBOUNCE    = 350.milliseconds
-    WATCH_POLL_PERIOD   = 200.milliseconds
+    DEFAULT_JOBS          =  6
+    MAX_GUARD_ROUNDS      =  8
+    MAX_RERUN_PASSES      =  3
+    MAX_PREFETCH_ROUNDS   = 10
+    MAX_BIBLIOGRAPHY_RUNS =  2
+    DEFAULT_DEBOUNCE      = 350.milliseconds
+    WATCH_POLL_PERIOD     = 200.milliseconds
 
     # Packages that are never worth fetching as arils: meta packages and pure binaries.
     SKIP_PACKAGE_PREFIXES = {"collection-", "scheme-", "texlive.infra", "00texlive"}
@@ -124,8 +125,16 @@ module Pomtex
       {cache_root, texmf_dir, downloads_dir, index_dir, arils_dir}.each { |dir| Dir.mkdir_p(dir) }
     end
 
+    # Meta packages and other platforms' binaries are never planted. Binary
+    # packages for this platform (e.g. biber.x86_64-linux) are, on request.
     def skip_package?(name : String) : Bool
+      return false if name.ends_with?(".#{PLATFORM}")
       name.includes?('.') || SKIP_PACKAGE_PREFIXES.any? { |prefix| name.starts_with?(prefix) }
+    end
+
+    # Executables planted from binary arils.
+    def aril_bin_dir : Path
+      texmf_dir.join("bin", PLATFORM)
     end
   end
 end
