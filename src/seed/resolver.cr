@@ -240,7 +240,19 @@ module Pomtex::Seed
       return nil if key.empty?
       idx.fonts[key]? ||
         idx.fonts.find { |stem, _| stem.starts_with?("#{key}regular") }.try(&.[1]) ||
-        idx.fonts.find { |stem, _| stem.starts_with?(key) }.try(&.[1])
+        font_candidates(name).first?
+    end
+
+    # Every font file whose name starts with `name`, upright regular faces first
+    # ("Inconsolata" → Inconsolatazi4-Regular.otf, InconsolataN-Regular.otf, ...).
+    def font_candidates(name : String) : Array(String)
+      idx = index
+      return [] of String unless idx
+      key = Index.normalize_font(File.basename(name, File.extname(name)))
+      return [] of String if key.empty?
+      idx.fonts.select { |stem, _| stem.starts_with?(key) }
+        .to_a.sort_by! { |stem, _| {stem.includes?("regular") ? 0 : 1, stem.size, stem} }
+        .map(&.[1])
     end
 
     # Expands `roots` with their dependencies, keeping only packages for which
