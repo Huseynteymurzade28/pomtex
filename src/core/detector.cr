@@ -59,6 +59,28 @@ module Pomtex::Core
       found
     end
 
+    # The TeX Live release of this installation, e.g. 2025: from its package
+    # database when it has one (TeX Live, the rind), else from `pdftex --version`
+    # ("pdfTeX 3.141592653-2.6-1.40.27 (TeX Live 2025/Arch Linux)").
+    def texlive_year : Int32?
+      tlpdb = bin_dir.parent.parent.join("tlpkg", "texlive.tlpdb")
+      if File.exists?(tlpdb)
+        File.each_line(tlpdb) do |line|
+          if match = line.match(/^depend release\/(\d{4})$/)
+            return match[1].to_i
+          end
+          # 00texlive.config sorts first; past it the release is not recorded.
+          break if line.starts_with?("name ") && !line.starts_with?("name 00texlive")
+        end
+      end
+      engine = executable("pdftex") || executable("pdflatex") || return nil
+      output = IO::Memory.new
+      Process.run(engine, ["--version"], output: output, error: Process::Redirect::Close)
+      output.to_s.match(/TeX Live (\d{4})/).try(&.[1].to_i)
+    rescue File::Error | IO::Error
+      nil
+    end
+
     def to_s(io : IO) : Nil
       io << origin.to_s.downcase << " TeX (" << bin_dir << ")"
     end

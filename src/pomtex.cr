@@ -42,6 +42,7 @@ module Pomtex
       Environment:
           POMTEX_HOME                      where pomtex keeps its data (default: $XDG_CACHE_HOME/pomtex)
           POMTEX_MIRROR                    TeX Live repository for arils (default: #{Config::DEFAULT_MIRROR})
+          POMTEX_HISTORIC_MIRROR           past TeX Live releases, used when the TeX kernel is older than tlnet
           POMTEX_RIND_VERSION              pin the TinyTeX release of the rind, e.g. v2026.10
           POMTEX_RIND_URL                  download the rind from this URL instead
           POMTEX_USE_RIND                  same as --rind
@@ -169,7 +170,7 @@ module Pomtex
       scan = Seed::Scanner.scan(file)
       toolchain = Core::Detector.detect(prefer_rind)
       present = toolchain ? toolchain.locate(scan.files, Engine::Runner.environment(toolchain)) : Set(String).new
-      resolver = Seed::Resolver.open(offline: offline) rescue Seed::Resolver.new(nil)
+      resolver = Seed::Resolver.for_release(toolchain.try(&.texlive_year), offline: offline) rescue Seed::Resolver.new(nil)
 
       puts "#{File.basename(file)} → #{scan.suggested_engine}#{scan.engine ? " (magic comment)" : ""}"
       puts "sources: #{scan.sources.map { |path| Path[path].relative_to(Path[file].expand.parent) }.join(", ")}"
@@ -222,7 +223,8 @@ module Pomtex
     end
 
     private def index_command : Int32
-      resolver = refresh ? Seed::Resolver.new(Seed::Resolver.rebuild_index) : Seed::Resolver.open(offline: offline)
+      year = Core::Detector.detect(prefer_rind).try(&.texlive_year)
+      resolver = Seed::Resolver.for_release(year, offline: offline, refresh: refresh)
       if index = resolver.index
         UI.ok "#{index.packages.size} packages, #{index.files.size} files (#{Config.index_file})"
         0
@@ -282,13 +284,17 @@ module Pomtex
     private def doctor_command : Int32
       puts "version     #{VERSION} (#{update_status})"
       puts "cache       #{Config.cache_root}"
-      puts "mirror      #{Config.mirror}"
       system_tc = Core::Detector.system_toolchain
       rind_tc = Core::Detector.rind_toolchain
       puts "system TeX  #{system_tc ? "#{system_tc.bin_dir} (#{system_tc.engines.join(", ")})" : "not found"}"
       puts "rind        #{rind_tc ? "#{rind_tc.bin_dir} (#{rind_tc.engines.join(", ")})" : "not grown (pomtex bootstrap)"}"
       active = Core::Detector.detect(prefer_rind)
       puts "active      #{active || "none"}"
+      if year = active.try(&.texlive_year)
+        Config.release = year if Seed::Resolver.historic?(year)
+        puts "release     TeX Live #{year}#{Config.release ? " (older than tlnet: arils from its frozen archive)" : ""}"
+      end
+      puts "mirror      #{Config.mirror}"
       if File.exists?(Config.index_file)
         age = Time.utc - File.info(Config.index_file).modification_time
         puts "index       #{UI.bytes(File.size(Config.index_file))}, #{age.days} day#{age.days == 1 ? "" : "s"} old"

@@ -20,6 +20,8 @@ module Pomtex
 
     # TeX Live network repository; every aril is `<mirror>/archive/<name>.tar.xz`.
     DEFAULT_MIRROR = "https://mirror.ctan.org/systems/texlive/tlnet"
+    # Frozen final states of past releases: `<historic>/<year>/tlnet-final`.
+    DEFAULT_HISTORIC_MIRROR = "https://ftp.math.utah.edu/pub/tex/historic/systems/texlive"
 
     # The rind: a TinyTeX-1 bundle, which ships pdftex/xetex/luatex binaries and prebuilt formats.
     RIND_REPO             = "rstudio/tinytex-releases"
@@ -96,8 +98,21 @@ module Pomtex
       cache_root.join("index")
     end
 
-    def index_file : Path
-      index_dir.join("files.idx")
+    # The TeX Live release arils must match, when the TeX kernel is older than
+    # tlnet: a new LaTeX kernel package breaks an old format ("LaTeX kernel too
+    # old"), so arils then come from that release's frozen archive.
+    @@release : Int32? = nil
+
+    def release : Int32?
+      @@release
+    end
+
+    def release=(year : Int32?)
+      @@release = year
+    end
+
+    def index_file(release : Int32? = @@release) : Path
+      release ? index_dir.join("files-#{release}.idx") : index_dir.join("files.idx")
     end
 
     # One `<name>.list` per installed aril: a `maps:` header, then its files.
@@ -106,7 +121,17 @@ module Pomtex
     end
 
     def mirror : String
-      (ENV["POMTEX_MIRROR"]?.presence || DEFAULT_MIRROR).rchop('/')
+      if custom = ENV["POMTEX_MIRROR"]?.presence
+        custom.rchop('/')
+      elsif year = @@release
+        "#{(ENV["POMTEX_HISTORIC_MIRROR"]?.presence || DEFAULT_HISTORIC_MIRROR).rchop('/')}/#{year}/tlnet-final"
+      else
+        DEFAULT_MIRROR
+      end
+    end
+
+    def custom_mirror? : Bool
+      !ENV["POMTEX_MIRROR"]?.presence.nil?
     end
 
     def aril_url(package : String) : String
