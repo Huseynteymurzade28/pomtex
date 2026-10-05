@@ -2,6 +2,7 @@ require "option_parser"
 require "file_utils"
 require "./config"
 require "./ui"
+require "./help"
 require "./core/detector"
 require "./core/bootstrap"
 require "./core/cache_lock"
@@ -26,15 +27,28 @@ module Pomtex
         pomtex fetch <pkg|file>...     plant arils explicitly (e.g. `pgf`, `tikz-cd.sty`)
         pomtex bootstrap [--force]     download the portable TeX kernel (the rind)
         pomtex index [--refresh]       build/refresh the CTAN file → package index
-        pomtex list                    show planted arils
+        pomtex list [--names]          show planted arils
         pomtex remove <aril>...        uproot arils
         pomtex clean [--all]           remove all arils (and with --all the rind and index)
         pomtex doctor                  report what pomtex sees on this machine
+        pomtex completions <shell>     print completions for bash, fish or zsh
+        pomtex manpage                 print the man page (roff)
 
       Options:
       TEXT
 
-    COMMANDS = {"build", "watch", "scan", "fetch", "bootstrap", "index", "list", "remove", "clean", "doctor"}
+    ENVIRONMENT = <<-TEXT
+
+      Environment:
+          POMTEX_HOME                      where pomtex keeps its data (default: $XDG_CACHE_HOME/pomtex)
+          POMTEX_MIRROR                    TeX Live repository for arils (default: #{Config::DEFAULT_MIRROR})
+          POMTEX_RIND_VERSION              pin the TinyTeX release of the rind, e.g. v2026.10
+          POMTEX_RIND_URL                  download the rind from this URL instead
+          POMTEX_USE_RIND                  same as --rind
+      TEXT
+
+    COMMANDS = {"build", "watch", "scan", "fetch", "bootstrap", "index", "list", "remove", "clean", "doctor",
+                "completions", "manpage"}
 
     property command = ""
     property engine : String? = nil
@@ -46,6 +60,7 @@ module Pomtex
     property force = false
     property refresh = false
     property all = false
+    property names = false
     property debounce = Config::DEFAULT_DEBOUNCE
     property args = [] of String
     @recorded = [] of Path
@@ -59,16 +74,18 @@ module Pomtex
       self.args = args.reject(&.empty?)
 
       case command
-      when "build"     then build_command
-      when "watch"     then watch_command
-      when "scan"      then scan_command
-      when "fetch"     then fetch_command
-      when "bootstrap" then bootstrap_command
-      when "index"     then index_command
-      when "list"      then list_command
-      when "remove"    then remove_command
-      when "clean"     then clean_command
-      when "doctor"    then doctor_command
+      when "build"       then build_command
+      when "watch"       then watch_command
+      when "scan"        then scan_command
+      when "fetch"       then fetch_command
+      when "bootstrap"   then bootstrap_command
+      when "index"       then index_command
+      when "list"        then list_command
+      when "remove"      then remove_command
+      when "clean"       then clean_command
+      when "doctor"      then doctor_command
+      when "completions" then completions_command
+      when "manpage"     then manpage_command
       when ""
         if (first = args.first?) && first.ends_with?(".tex")
           build_command
@@ -110,6 +127,7 @@ module Pomtex
         parser.on("--force", "bootstrap: download the rind again") { self.force = true }
         parser.on("--refresh", "index: rebuild the index from tlnet") { self.refresh = true }
         parser.on("--all", "clean: also remove the rind and the index") { self.all = true }
+        parser.on("--names", "list: print aril names only") { self.names = true }
         parser.on("-v", "--verbose", "Explain every decision") { UI.verbose = true }
         parser.on("-q", "--quiet", "Only print errors") { UI.quiet = true }
         parser.on("--version", "Print the version") do
@@ -120,6 +138,7 @@ module Pomtex
           puts parser
           exit 0
         end
+        parser.separator ENVIRONMENT
         parser.unknown_args { |before, after| self.args = before + after }
         parser.invalid_option { |flag| raise OptionParser::InvalidOption.new(flag) }
       end
@@ -215,6 +234,10 @@ module Pomtex
 
     private def list_command : Int32
       entries = Seed::Manifest.entries
+      if names
+        entries.each { |entry| puts entry.name }
+        return 0
+      end
       if entries.empty?
         UI.info "no arils planted yet"
         return 0
@@ -275,6 +298,17 @@ module Pomtex
       puts "arils       #{Seed::Manifest.entries.size} planted"
       puts "xz          #{Process.find_executable("xz") || "MISSING — required to unpack arils"}"
       Process.find_executable("xz") ? 0 : 1
+    end
+
+    private def completions_command : Int32
+      shell = args.first? || raise Error.new("completions needs a shell: #{Help::SHELLS.join(", ")}")
+      print Help.completion(shell, build_parser.to_s)
+      0
+    end
+
+    private def manpage_command : Int32
+      print Help.man(build_parser.to_s)
+      0
     end
 
     # ── helpers ─────────────────────────────────────────────────────────────
