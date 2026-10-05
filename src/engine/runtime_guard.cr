@@ -24,6 +24,7 @@ module Pomtex::Engine
       enum Kind
         File
         Font
+        Type1
       end
     end
 
@@ -33,6 +34,9 @@ module Pomtex::Engine
     MKTEXTFM       = /kpathsea: Running mktextfm ([A-Za-z0-9_\-]+)/
     MISSING_ENC    = /\(file ([^()\s]+\.enc)\): cannot open encoding file/
     MISSING_MAP    = /\(file ([^()\s]+\.map)\)/
+    MISSING_TYPE1  = /\(file ([^()\s]+\.pf[ab])\): cannot open Type 1 font file/
+    # No map entry and no PK bitmap: pdfTeX gave up on the font entirely.
+    PK_FONT        = /\(file [^()\s]+\): Font ([A-Za-z0-9_\-]+) at \d+ not found/
     FONTSPEC_FONT  = /The font "([^"]+)" cannot be found/
     BABEL_LANGUAGE = /Package babel Error: Unknown option [`'"]([A-Za-z]+)'/
     RERUN          = /Rerun to get|Label\(s\) may have changed|Please \(?re\)?run LaTeX|\(rerunfilecheck\).*Rerun|Please rerun/
@@ -45,6 +49,8 @@ module Pomtex::Engine
       log.scan(MISSING_TFM) { |m| found << Missing.new(Missing::Kind::File, "#{m[1]}.tfm") }
       log.scan(MKTEXTFM) { |m| found << Missing.new(Missing::Kind::File, "#{m[1]}.tfm") }
       log.scan(MISSING_ENC) { |m| found << Missing.new(Missing::Kind::File, File.basename(m[1])) }
+      log.scan(MISSING_TYPE1) { |m| found << Missing.new(Missing::Kind::File, File.basename(m[1])) }
+      log.scan(PK_FONT) { |m| found << Missing.new(Missing::Kind::Type1, m[1]) }
       log.each_line do |line|
         next unless line.includes?("cannot open") && line.includes?("map file")
         if m = line.match(MISSING_MAP)
@@ -55,6 +61,19 @@ module Pomtex::Engine
       # babel reports a missing language definition as an unknown option.
       log.scan(BABEL_LANGUAGE) { |m| found << Missing.new(Missing::Kind::File, "#{m[1]}.ldf") }
       found.uniq
+    end
+
+    # The Type 1 file a font map assigns to `font` (`ptmr8r Times-Roman "..." <8r.enc <utmr8a.pfb`).
+    def self.type1_file(font : String, map : String) : String?
+      map.each_line do |line|
+        fields = line.split
+        next unless fields.first? == font
+        fields.each do |field|
+          name = field.lchop('<').lchop('<').lchop('[')
+          return name if name.ends_with?(".pfb") || name.ends_with?(".pfa")
+        end
+      end
+      nil
     end
 
     def self.rerun_needed?(log : String) : Bool
@@ -168,9 +187,21 @@ module Pomtex::Engine
         UI.step "Runtime guard caught #{missing.map(&.name).join(", ")}"
         files = missing.select(&.kind.file?).map(&.name)
         fonts = missing.select(&.kind.font?).map(&.name)
+        files.concat(type1_files(missing.select(&.kind.type1?).map(&.name), runner.map_files))
         planted = provision(files, fonts)
         # Nothing new could be planted: retrying would fail the same way.
         return result if planted == 0
+      end
+    end
+
+    # The outline files behind fonts pdfTeX could not embed: whatever the loaded
+    # maps name, else `<font>.pfb`, the usual name for fonts without a map entry.
+    private def type1_files(fonts : Array(String), map_files : Array(String)) : Array(String)
+      return [] of String if fonts.empty?
+      maps = toolchain.lookup(["pdftex.map"] + map_files, environment).values
+        .compact_map { |path| File.read(path).scrub rescue nil }
+      fonts.map do |font|
+        maps.compact_map { |map| self.class.type1_file(font, map) }.first? || "#{font}.pfb"
       end
     end
 

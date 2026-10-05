@@ -17,6 +17,28 @@ describe Pomtex::Engine::RuntimeGuard do
     ]
   end
 
+  it "recognises missing Type 1 fonts" do
+    log = <<-'LOG'
+      !pdfTeX error: pdflatex (file utmr8a.pfb): cannot open Type 1 font file for reading
+      !pdfTeX error: /usr/bin/pdflatex (file xyz): Font xyz at 600 not found
+      LOG
+    Guard.missing_from_log(log).should eq [
+      Guard::Missing.new(Guard::Missing::Kind::File, "utmr8a.pfb"),
+      Guard::Missing.new(Guard::Missing::Kind::Type1, "xyz"),
+    ]
+  end
+
+  it "finds a font's Type 1 file in a map" do
+    map = <<-'MAP'
+      % times.map
+      ptmr8r Times-Roman "TeXBase1Encoding ReEncodeFont" <8r.enc <utmr8a.pfb
+      futr8r Futura <[8r.enc <ufutr8a.pfa
+      MAP
+    Guard.type1_file("ptmr8r", map).should eq "utmr8a.pfb"
+    Guard.type1_file("futr8r", map).should eq "ufutr8a.pfa"
+    Guard.type1_file("ptmr8", map).should be_nil
+  end
+
   it "recognises fontspec font misses" do
     missing = Guard.missing_from_log(%(! Package fontspec Error: The font "Libertinus Serif" cannot be found;))
     missing.should eq [Guard::Missing.new(Guard::Missing::Kind::Font, "Libertinus Serif")]
