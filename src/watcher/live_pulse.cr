@@ -1,36 +1,49 @@
 require "../config"
+require "./inotify"
 
 module Pomtex::Watcher
-  # Polls the document and everything it inputs, and fires a rebuild once the
+  # Watches the document and everything it inputs, and fires a rebuild once the
   # files have been quiet for `debounce` (editors often write in several steps).
   #
-  #     poll fiber ──(changed path)──▶ [pulses] ──▶ debounce (select/timeout) ──▶ rebuild
+  #     inotify fiber ─┐
+  #                    ├─(changed path)──▶ [pulses] ──▶ debounce (select/timeout) ──▶ rebuild
+  #     poll fiber ────┘
+  #
+  # inotify covers what it can; files it can't (network file systems, no
+  # inotify at all) are polled for mtime changes instead.
   class LivePulse
     getter debounce : Time::Span
     getter poll : Time::Span
 
     # `rebuild` compiles and returns the set of files to watch from then on.
     def initialize(@debounce = Config::DEFAULT_DEBOUNCE, @poll = Config::WATCH_POLL_PERIOD,
-                   &@rebuild : -> Array(Path))
-      @watched = [] of Path
+                   @inotify : Inotify? = Inotify.open, &@rebuild : -> Array(Path))
+      @watched = Set(Path).new
+      @polled = [] of Path
       @stamps = {} of Path => Time?
     end
 
     def run : NoReturn
       pulses = Channel(Path).new(64)
-      @watched = @rebuild.call
-      snapshot
-      announce
+      rewatch
+
+      if inotify = @inotify
+        spawn do
+          inotify.each_event do |path|
+            if path.nil?
+              # The kernel dropped events: assume something we watch changed.
+              @watched.first?.try { |any| pulses.send(any) }
+            elsif @watched.includes?(path) && changed?(path)
+              pulses.send(path)
+            end
+          end
+        end
+      end
 
       spawn do
         loop do
           sleep poll
-          @watched.each do |path|
-            stamp = mtime(path)
-            next if stamp == @stamps[path]?
-            @stamps[path] = stamp
-            pulses.send(path)
-          end
+          @polled.each { |path| pulses.send(path) if changed?(path) }
         end
       end
 
@@ -47,18 +60,26 @@ module Pomtex::Watcher
           end
         end
         UI.step "#{changed.map { |path| File.basename(path) }.join(", ")} changed — #{Time.local.to_s("%H:%M:%S")}"
-        @watched = @rebuild.call
-        snapshot
-        announce
+        rewatch
       end
     end
 
-    private def snapshot : Nil
-      @stamps = @watched.to_h { |path| {path, mtime(path)} }
+    private def rewatch : Nil
+      list = @rebuild.call
+      @watched = list.to_set
+      @polled = @inotify.try(&.watch(list)) || list
+      # Files the build itself rewrote (a .bbl from BibTeX) must not trigger
+      # another build: only changes after this snapshot count.
+      @stamps = list.to_h { |path| {path, mtime(path)} }
+      UI.debug "polling: #{@polled.join(", ")}" unless @polled.empty? || @inotify.nil?
+      UI.info "watching #{list.size} file#{list.size == 1 ? "" : "s"} (Ctrl-C to stop)"
     end
 
-    private def announce : Nil
-      UI.info "watching #{@watched.size} file#{@watched.size == 1 ? "" : "s"} (Ctrl-C to stop)"
+    private def changed?(path : Path) : Bool
+      stamp = mtime(path)
+      return false if stamp == @stamps[path]?
+      @stamps[path] = stamp
+      true
     end
 
     private def mtime(path : Path) : Time?
