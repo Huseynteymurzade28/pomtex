@@ -28,6 +28,9 @@ jobs:
           name="pomtex-${GITHUB_REF_NAME#v}-linux-x86_64"
           mkdir -p "dist/$name"
           cp bin/pomtex README.md LICENSE "dist/$name/"
+          mkdir -p "dist/$name/share"
+          for shell in bash fish zsh; do bin/pomtex completions "$shell" > "dist/$name/share/pomtex.$shell"; done
+          bin/pomtex manpage > "dist/$name/share/pomtex.1"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
           cat dist/*.sha256

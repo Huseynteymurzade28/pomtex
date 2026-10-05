@@ -201,10 +201,12 @@ pomtex <command> [options]
 | `fetch <name>...` | Install packages by package name (`mhchem`) or file name (`tikz-cd.sty`) |
 | `bootstrap [--force]` | Download the TeX kernel. This also happens automatically on first build. |
 | `index [--refresh]` | Build or refresh the file-to-package index |
-| `list` | List installed packages |
+| `list [--names]` | List installed packages (`--names`: names only) |
 | `remove <name>...` | Remove installed packages |
 | `clean [--all]` | Remove all installed packages. `--all` also removes the kernel and the index. |
 | `doctor` | Show the detected TeX installation, cache state and requirements |
+| `completions <shell>` | Print shell completions for `bash`, `fish` or `zsh` |
+| `manpage` | Print the man page (roff) |
 
 | Option | Description |
 |---|---|
@@ -217,6 +219,20 @@ pomtex <command> [options]
 | `--debounce=MS` | Quiet period before `watch` recompiles (default: 350) |
 | `-v`, `--verbose` | Explain each decision |
 | `-q`, `--quiet` | Print errors only |
+
+### Shell completions and man page
+
+The AUR packages and `make install` install completions for bash, fish and zsh and the
+`pomtex(1)` man page. With the release tarball, install them by hand:
+
+```sh
+pomtex completions fish > ~/.config/fish/completions/pomtex.fish
+pomtex completions bash > ~/.local/share/bash-completion/completions/pomtex
+pomtex completions zsh  > "${fpath[1]}/_pomtex"
+pomtex manpage > ~/.local/share/man/man1/pomtex.1
+```
+
+Both are generated from `pomtex --help`, so they always match the installed version.
 
 ### Environment variables
 
