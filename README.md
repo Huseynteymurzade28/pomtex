@@ -47,7 +47,7 @@ independent seeds. The CLI output uses the same terms:
 
 - **Static analysis before compiling.** Detects `\documentclass`, `\usepackage`, `\RequirePackage`, `\usetikzlibrary`, `\usepgfplotslibrary`, beamer themes, babel languages, bibliography styles and fontspec fonts. It follows local `\input`, `\include`, `\subfile` and `\import` chains, and local `.sty` files.
 - **Load-graph prefetching.** Packages often load other packages that TeX Live's metadata does not list as dependencies (for example, tcolorbox's `skins` library needs `tikzfill`). pomtex reads the newly installed packages, follows the files they load unconditionally, and installs everything in parallel batches before the first compile.
-- **Runtime recovery.** If the log still reports a missing file (`.sty`, `.cls`, TFM, encoding or map file, or a fontspec font), pomtex installs the package that provides it and compiles again.
+- **Runtime recovery.** If the log still reports a missing file (`.sty`, `.cls`, TFM, Type 1 `.pfb`, encoding or map file, or a fontspec font), pomtex installs the package that provides it and compiles again.
 - **Parallel downloads.** Packages download concurrently on Crystal fibers and are unpacked while the rest are still downloading.
 - **Bibliographies.** Runs BibTeX or Biber when the citations, the `.bib` files or the `.bbl` change, then reruns LaTeX until the references settle. Biber is installed from TeX Live on first use, so it always matches the installed biblatex. Missing `.bst` styles are installed like any other package.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
