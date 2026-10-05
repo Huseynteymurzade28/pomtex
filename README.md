@@ -53,7 +53,7 @@ independent seeds. The CLI output uses the same terms:
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
 - **Font handling.** OpenType fonts are resolved by family name and made visible to XeTeX through a generated fontconfig file. Type 1 map files are passed to pdfTeX automatically. If a font name doesn't match any family, pomtex reads the real family names from the installed font files and suggests one, for example `\setmonofont{Inconsolatazi4}` for "Inconsolata".
 - **Safe to run concurrently.** Several pomtex processes can share the cache, for example `pomtex watch` in one terminal and `pomtex build` in another. Writes take an exclusive lock and compiles take a shared one, so a process that waits reuses whatever the other one just installed.
-- **Watch mode.** Recompiles on save, with debouncing. It watches every project file the engine actually read (from the `-recorder` log), plus graphics, bibliographies and listings found by the scanner, so it keeps working even when a compile fails part-way.
+- **Watch mode.** Recompiles on save, with debouncing. It watches every project file the engine actually read (from the `-recorder` log), plus graphics, bibliographies and listings found by the scanner, so it keeps working even when a compile fails part-way. Changes arrive through inotify; files on network file systems (NFS, SMB, sshfs, WSL's `/mnt`) are polled instead.
 - **Single binary.** About 3 MB dynamically linked, or about 8 MB fully static.
 
 ## Installation
@@ -297,6 +297,7 @@ src/
 ├── pomtex.cr               command-line interface
 ├── config.cr               paths, constants, built-in file-to-package hints
 ├── ui.cr                   terminal output
+├── help.cr                 shell completions and man page from --help
 ├── core/
 │   ├── detector.cr         TeX installation detection, batched kpsewhich
 │   └── bootstrap.cr        kernel download and installation
@@ -310,7 +311,8 @@ src/
 │   ├── runtime_guard.cr    log analysis and recovery
 │   └── bibliography.cr     BibTeX/Biber detection and runs
 └── watcher/
-    └── live_pulse.cr       file watching with debouncing
+    ├── live_pulse.cr       file watching with debouncing
+    └── inotify.cr          inotify binding, network file system detection
 ```
 
 To publish a release, bump `version` in `shard.yml` and `VERSION` in
