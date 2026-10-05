@@ -101,7 +101,7 @@ module Pomtex::Engine
     end
 
     def resolver : Seed::Resolver
-      @resolver ||= Seed::Resolver.open(offline: offline)
+      @resolver ||= Seed::Resolver.for_release(toolchain.texlive_year, offline: offline)
     end
 
     # Compiles `runner`'s document. Returns the final result (successful or not).

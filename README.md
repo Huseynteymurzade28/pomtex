@@ -52,6 +52,7 @@ independent seeds. The CLI output uses the same terms:
 - **Bibliographies.** Runs BibTeX or Biber when the citations, the `.bib` files or the `.bbl` change, then reruns LaTeX until the references settle. Biber is installed from TeX Live on first use, so it always matches the installed biblatex. Missing `.bst` styles are installed like any other package.
 - **Engine selection.** Picks XeLaTeX for `fontspec`, `unicode-math` and `polyglossia`, and LuaLaTeX for `\directlua`. A `% !TEX program = ...` comment overrides both.
 - **Font handling.** OpenType fonts are resolved by family name and made visible to XeTeX through a generated fontconfig file. Type 1 map files are passed to pdfTeX automatically. If a font name doesn't match any family, pomtex reads the real family names from the installed font files and suggests one, for example `\setmonofont{Inconsolatazi4}` for "Inconsolata".
+- **Matching TeX Live releases.** Packages always come from the TeX Live release of the TeX installation in use. Once tlnet moves on to a new year, a kernel from the previous year gets its packages from that year's frozen archive (`tlnet-final`), so a new LaTeX kernel package never meets an old format. `pomtex bootstrap --force` updates the rind to the current release.
 - **Safe to run concurrently.** Several pomtex processes can share the cache, for example `pomtex watch` in one terminal and `pomtex build` in another. Writes take an exclusive lock and compiles take a shared one, so a process that waits reuses whatever the other one just installed.
 - **Watch mode.** Recompiles on save, with debouncing. It watches every project file the engine actually read (from the `-recorder` log), plus graphics, bibliographies and listings found by the scanner, so it keeps working even when a compile fails part-way. Changes arrive through inotify; files on network file systems (NFS, SMB, sshfs, WSL's `/mnt`) are polled instead.
 - **Single binary.** About 3 MB dynamically linked, or about 8 MB fully static.
@@ -240,6 +241,7 @@ Both are generated from `pomtex --help`, so they always match the installed vers
 |---|---|---|
 | `POMTEX_HOME` | `$XDG_CACHE_HOME/pomtex` | Location of all pomtex data |
 | `POMTEX_MIRROR` | `https://mirror.ctan.org/systems/texlive/tlnet` | TeX Live repository used for packages |
+| `POMTEX_HISTORIC_MIRROR` | `https://ftp.math.utah.edu/pub/tex/historic/systems/texlive` | Archive of past TeX Live releases, used when the TeX kernel is older than tlnet |
 | `POMTEX_RIND_VERSION` | latest TinyTeX release | Pin the kernel version, for example `v2026.10` |
 | `POMTEX_RIND_URL` | GitHub release asset | Download the kernel from a custom URL |
 | `POMTEX_USE_RIND` | unset | Equivalent to `--rind` |

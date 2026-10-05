@@ -21,6 +21,8 @@ module Pomtex::Seed
     getter packages = {} of String => Package
     getter files = {} of String => String
     getter fonts = {} of String => String
+    # The TeX Live release the repository belongs to (00texlive.config).
+    property release : Int32? = nil
 
     # Parses a texlive.tlpdb stream. Only run files are indexed; doc/src files are
     # never fetched because arils are run-time containers.
@@ -77,7 +79,11 @@ module Pomtex::Seed
           when "name"              then name = value
           when "containersize"     then size = value.to_i64? || 0_i64
           when "containerchecksum" then sha = value
-          when "depend"            then depends << value unless value.includes?("ARCH")
+          when "depend"
+            if name == "00texlive.config" && value.starts_with?("release/")
+              index.release = value.lchop("release/").to_i?
+            end
+            depends << value unless value.includes?("ARCH")
           when "execute"
             action, _, argument = value.partition(' ')
             maps << argument if action == "addMap" || action == "addMixedMap"
@@ -103,6 +109,7 @@ module Pomtex::Seed
               fields[4].presence, split_list(fields[6]))
           when "F" then index.files[fields[1]] = fields[2] if fields.size >= 3
           when "T" then index.fonts[fields[1]] = fields[2] if fields.size >= 3
+          when "Y" then index.release = fields[1]?.try(&.to_i?)
           end
         end
       end
@@ -113,6 +120,7 @@ module Pomtex::Seed
       tmp = Path["#{path}.tmp"]
       File.open(tmp, "w") do |file|
         file.puts FORMAT_TAG
+        release.try { |year| file << "Y\t" << year << '\n' }
         packages.each_value do |pkg|
           file << "P\t" << pkg.name << '\t' << pkg.size << '\t' << pkg.sha512 << '\t' << (pkg.probe || "") << '\t'
           file << pkg.depends.join(',') << '\t' << pkg.maps.join(',') << '\n'
@@ -121,6 +129,16 @@ module Pomtex::Seed
         fonts.each { |key, base| file << "T\t" << key << '\t' << base << '\n' }
       end
       File.rename(tmp, path)
+    end
+
+    # The release recorded in a cached index, without loading all of it.
+    def self.cached_release(path : Path) : Int32?
+      return nil unless File.exists?(path)
+      File.open(path) do |file|
+        return nil unless file.gets(chomp: true) == FORMAT_TAG
+        line = file.gets(chomp: true) || ""
+        line.starts_with?("Y\t") ? line.lchop("Y\t").to_i? : nil
+      end
     end
 
     def self.normalize_font(name : String) : String
@@ -171,8 +189,42 @@ module Pomtex::Seed
       end
     end
 
+    # Opens the index whose arils match a TeX kernel from TeX Live `year`:
+    # current tlnet, or the frozen archive of `year` once tlnet has moved on.
+    def self.for_release(year : Int32?, offline : Bool = false, refresh : Bool = false) : Resolver
+      Config.release = nil
+      return open(offline: offline, refresh: refresh) if year.nil? || Config.custom_mirror?
+
+      unless File.exists?(Config.index_file(year))
+        current = open(offline: offline, refresh: refresh)
+        latest = current.index.try(&.release)
+        return current unless latest && year < latest
+        UI.info "the TeX kernel is from TeX Live #{year} but tlnet is #{latest}; arils now come from the #{year} archive"
+      end
+
+      Config.release = year
+      begin
+        open(offline: offline, refresh: refresh)
+      rescue ex
+        Config.release = nil
+        UI.warn "the TeX Live #{year} archive is unavailable (#{ex.message}); using current tlnet, which may not match the kernel"
+        open(offline: offline)
+      end
+    end
+
+    # Whether arils for a TeX Live `year` kernel come from its frozen archive.
+    # Answers from cached indexes only; never touches the network.
+    def self.historic?(year : Int32?) : Bool
+      return false if year.nil? || Config.custom_mirror?
+      return true if File.exists?(Config.index_file(year))
+      latest = Index.cached_release(Config.index_file(nil))
+      !latest.nil? && year < latest
+    end
+
     def self.fresh? : Bool
       info = File.info?(Config.index_file)
+      # A release's tlnet-final archive is frozen: its index never goes stale.
+      return !info.nil? if Config.release
       !info.nil? && info.modification_time > Time.utc - Index::MAX_AGE
     end
 
