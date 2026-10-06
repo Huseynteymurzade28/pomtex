@@ -1,5 +1,5 @@
 name: pomtex
-version: 0.3.1
+version: 0.3.2
 
 description: |
   The pomegranate-inspired, on-demand LaTeX engine & package resolver.
