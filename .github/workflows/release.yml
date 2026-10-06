@@ -9,7 +9,16 @@ permissions:
 
 jobs:
   static-linux:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+            pkgarch: amd64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+            pkgarch: arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -25,7 +34,7 @@ jobs:
 
       - name: Package
         run: |
-          name="pomtex-${GITHUB_REF_NAME#v}-linux-x86_64"
+          name="pomtex-${GITHUB_REF_NAME#v}-linux-${{ matrix.arch }}"
           mkdir -p "dist/$name"
           cp bin/pomtex README.md LICENSE "dist/$name/"
           mkdir -p "dist/$name/share"
@@ -36,12 +45,12 @@ jobs:
 
       - name: Build .deb and .rpm
         run: |
-          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" nfpm
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}.tar.gz" | tar -xz -C "$RUNNER_TEMP" nfpm
           version="${GITHUB_REF_NAME#v}"
-          cp -r "dist/pomtex-$version-linux-x86_64" dist/pkg
+          cp -r "dist/pomtex-$version-linux-${{ matrix.arch }}" dist/pkg
           gzip -9n dist/pkg/share/pomtex.1
           for packager in deb rpm; do
-            VERSION="$version" "$RUNNER_TEMP/nfpm" package -f packaging/nfpm.yaml -p "$packager" -t dist/
+            VERSION="$version" ARCH="${{ matrix.pkgarch }}" "$RUNNER_TEMP/nfpm" package -f packaging/nfpm.yaml -p "$packager" -t dist/
           done
           (cd dist && for f in *.deb *.rpm; do sha256sum "$f" > "$f.sha256"; done)
           cat dist/*.sha256
@@ -55,9 +64,29 @@ jobs:
           dpkg-deb --info dist/*.deb
           dpkg-deb --contents dist/*.deb
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/*.rpm
+            dist/*.sha256
+
+  publish:
+    needs: static-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dist-*
+          path: dist
+          merge-multiple: true
+
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.deb dist/*.rpm dist/*.sha256 \
+          ls -l dist
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
             --title "pomtex $GITHUB_REF_NAME" --generate-notes

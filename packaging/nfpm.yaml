@@ -1,8 +1,8 @@
 # .deb and .rpm packages, built by .github/workflows/release.yml:
-#   VERSION=0.3.1 nfpm package -f packaging/nfpm.yaml -p deb -t dist/
+#   VERSION=0.3.1 ARCH=amd64 nfpm package -f packaging/nfpm.yaml -p deb -t dist/
 # dist/pkg is an unpacked release tarball with the man page already gzipped.
 name: pomtex
-arch: amd64
+arch: ${ARCH}
 platform: linux
 version: ${VERSION}
 release: 1

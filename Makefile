@@ -22,7 +22,7 @@ release: $(SOURCES)
 	@mkdir -p bin
 	$(CRYSTAL) build src/pomtex.cr -o $(BIN) --release --no-debug
 
-# Fully static x86_64 binary (via Docker/Podman and Alpine musl).
+# Fully static binary for the host architecture (via Docker/Podman and Alpine musl).
 static:
 	@mkdir -p bin
 	docker run --rm -v $(CURDIR):/src -w /src $(STATIC_IMAGE) \

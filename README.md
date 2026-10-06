@@ -59,7 +59,7 @@ independent seeds. The CLI output uses the same terms:
 
 ## Installation
 
-### Any Linux distribution (install script)
+### Linux (install script)
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | sh
@@ -71,6 +71,14 @@ On Debian and Ubuntu the script installs the `.deb`, on Fedora and openSUSE the 
 curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | POMTEX_LOCAL=1 sh   # no sudo, ~/.local
 curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | PREFIX=/opt/pomtex sh
 ```
+
+### macOS (Homebrew)
+
+```sh
+brew install Huseynteymurzade28/pomtex/pomtex
+```
+
+Homebrew builds pomtex from source and pulls in `xz`. Upgrade with `brew upgrade pomtex`.
 
 ### Arch Linux (AUR)
 
@@ -84,8 +92,8 @@ yay -S pomtex         # build from source
 The [latest release](https://github.com/Huseynteymurzade28/pomtex/releases/latest) has a `.deb` and an `.rpm`:
 
 ```sh
-sudo apt install ./pomtex_*_amd64.deb                                 # Debian, Ubuntu
-sudo dnf install ./pomtex-*.x86_64.rpm                                # Fedora
+sudo apt install ./pomtex_*_amd64.deb                                 # Debian, Ubuntu (arm64.deb on ARM)
+sudo dnf install ./pomtex-*.x86_64.rpm                                # Fedora (aarch64.rpm on ARM)
 sudo zypper install --allow-unsigned-rpm ./pomtex-*.x86_64.rpm        # openSUSE
 ```
 
@@ -96,7 +104,7 @@ curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/po
 install -Dm755 pomtex-0.3.1-linux-x86_64/pomtex ~/.local/bin/pomtex
 ```
 
-The binary is statically linked and runs on any x86_64 Linux distribution.
+The binary is statically linked and runs on any x86_64 Linux distribution; use `linux-aarch64` in the file name on 64-bit ARM.
 
 ### From source
 
@@ -297,7 +305,7 @@ Data layout:
 
 ```text
 ~/.cache/pomtex/
-├── rind/        TeX kernel (bin/x86_64-linux/pdflatex, formats, ...)
+├── rind/        TeX kernel (bin/<platform>/pdflatex, formats, ...)
 ├── texmf/       installed packages
 ├── arils/       one manifest per installed package
 ├── index/       file-to-package index
@@ -347,8 +355,7 @@ binary and attaches it to a GitHub release.
 ## Limitations
 
 - **The kernel is larger than intended.** TinyTeX-1 is a 51 MB download and about 190 MB unpacked. A smaller pdfTeX-only kernel is planned ([#1](https://github.com/Huseynteymurzade28/pomtex/issues/1)).
-- Only Linux x86_64 is supported ([#8](https://github.com/Huseynteymurzade28/pomtex/issues/8)).
-- Packages always come from the current TeX Live release. A kernel from an older release may need `pomtex bootstrap --force` after the yearly TeX Live update ([#7](https://github.com/Huseynteymurzade28/pomtex/issues/7)).
+- Linux (x86_64, aarch64) and macOS only. On Windows, use WSL and the `.deb`.
 
 ## Acknowledgements
 

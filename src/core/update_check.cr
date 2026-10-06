@@ -53,11 +53,18 @@ module Pomtex::Core
     def upgrade_hint(executable : String? = Process.executable_path) : String
       if executable && (package = owner(executable, "pacman", ["-Qqo"]))
         "yay -S #{package}"
+      elsif executable && homebrew?(executable)
+        "brew upgrade pomtex"
       elsif executable && (owner(executable, "dpkg-query", ["-S"]) || owner(executable, "rpm", ["-qf"]))
         "curl -fsSL https://raw.githubusercontent.com/#{Config::REPO}/main/install.sh | sh"
       else
         "https://github.com/#{Config::REPO}/releases/latest"
       end
+    end
+
+    # Homebrew links bin/pomtex to its Cellar/pomtex/<version>/bin/pomtex.
+    def homebrew?(path : String) : Bool
+      (File.realpath(path) rescue path).includes?("/Cellar/pomtex/")
     end
 
     # The package that owns `path` according to a package manager's query command.

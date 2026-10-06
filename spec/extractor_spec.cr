@@ -13,9 +13,13 @@ describe Pomtex::Seed::Extractor do
       File.chmod(src.join("tex/run.sh"), 0o755)
       File.symlink("run.sh", src.join("tex/link.sh"))
 
+      # GNU tar calls the format "gnu", bsdtar (macOS) "gnutar".
+      version = IO::Memory.new
+      Process.run("tar", ["--version"], output: version)
+      format = version.to_s.includes?("bsdtar") ? "--format=gnutar" : "--format=gnu"
       {"gz" => "-czf", "xz" => "-cJf"}.each do |ext, flag|
         archive = dir.join("aril.tar.#{ext}")
-        Process.run("tar", ["--format=gnu", flag, archive.to_s, "-C", src.to_s, "tex", "tlpkg"]).success?.should be_true
+        Process.run("tar", [format, flag, archive.to_s, "-C", src.to_s, "tex", "tlpkg"]).success?.should be_true
         dest = dir.join("out-#{ext}")
         written = Pomtex::Seed::Extractor.extract_aril(archive, dest)
 

@@ -4,7 +4,7 @@ require "path"
 #
 # Layout under the cache root (default `~/.cache/pomtex`, honours `$XDG_CACHE_HOME`):
 #
-#     rind/         the portable TeX kernel (TinyTeX-1), bin/x86_64-linux/...
+#     rind/         the portable TeX kernel (TinyTeX-1), bin/<PLATFORM>/...
 #     texmf/        the user texmf tree that arils are unpacked into
 #     downloads/    in-flight and verified archives
 #     index/        the file -> package index built from texlive.tlpdb
@@ -15,8 +15,22 @@ module Pomtex
   module Config
     extend self
 
-    PLATFORM = "x86_64-linux"
-    REPO     = "Huseynteymurzade28/pomtex"
+    # TeX Live's name for this platform (`bin/<PLATFORM>`, binary arils such as
+    # `biber.<PLATFORM>`) and the matching TinyTeX bundle.
+    {% if flag?(:darwin) %}
+      PLATFORM              = "universal-darwin"
+      RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-darwin-%s.tar.xz"
+    {% elsif flag?(:linux) && flag?(:aarch64) %}
+      PLATFORM              = "aarch64-linux"
+      RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-arm64-%s.tar.xz"
+    {% elsif flag?(:linux) && flag?(:x86_64) %}
+      PLATFORM              = "x86_64-linux"
+      RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-x86_64-%s.tar.xz"
+    {% else %}
+      {% raise "pomtex supports x86_64 and aarch64 Linux, and macOS" %}
+    {% end %}
+
+    REPO = "Huseynteymurzade28/pomtex"
 
     # TeX Live network repository; every aril is `<mirror>/archive/<name>.tar.xz`.
     DEFAULT_MIRROR = "https://mirror.ctan.org/systems/texlive/tlnet"
@@ -24,10 +38,10 @@ module Pomtex
     DEFAULT_HISTORIC_MIRROR = "https://ftp.math.utah.edu/pub/tex/historic/systems/texlive"
 
     # The rind: a TinyTeX-1 bundle, which ships pdftex/xetex/luatex binaries and prebuilt formats.
-    RIND_REPO             = "rstudio/tinytex-releases"
-    RIND_PINNED_VERSION   = "v2026.10"
-    RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-x86_64-%s.tar.xz"
-    RIND_TOP_DIR          = ".TinyTeX"
+    RIND_REPO           = "rstudio/tinytex-releases"
+    RIND_PINNED_VERSION = "v2026.10"
+    # The bundle's top directory: `.TinyTeX` on Linux, `TinyTeX` on macOS.
+    RIND_TOP_DIRS = {".TinyTeX", "TinyTeX"}
 
     DEFAULT_JOBS          =  6
     MAX_GUARD_ROUNDS      =  8

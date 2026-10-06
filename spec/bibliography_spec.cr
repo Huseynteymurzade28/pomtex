@@ -20,7 +20,7 @@ end
 # Pretends the tool ran successfully, which records what it ran on.
 private def pretend_run(tool : Bib::Tool, runner : Pomtex::Engine::Runner, dir : Path) : Nil
   File.write(dir.join("paper.bbl"), "")
-  Bib.run(tool, "/bin/true", runner).success.should be_true
+  Bib.run(tool, Process.find_executable("true").not_nil!, runner).success.should be_true
 end
 
 describe Pomtex::Engine::Bibliography do

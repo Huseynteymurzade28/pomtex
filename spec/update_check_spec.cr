@@ -15,4 +15,8 @@ describe Pomtex::Core::UpdateCheck do
   it "points non-package installs at the release page" do
     Pomtex::Core::UpdateCheck.upgrade_hint("/nonexistent/pomtex").should eq "https://github.com/Huseynteymurzade28/pomtex/releases/latest"
   end
+
+  it "recognises Homebrew installs" do
+    Pomtex::Core::UpdateCheck.upgrade_hint("/opt/homebrew/Cellar/pomtex/0.3.2/bin/pomtex").should eq "brew upgrade pomtex"
+  end
 end
