@@ -37,9 +37,9 @@ module Pomtex::Core
 
       staging = Path["#{Config.rind_dir}.staging"]
       FileUtils.rm_rf(staging)
-      prefix = "#{Config::RIND_TOP_DIR}/"
       Seed::Extractor.extract(archive, staging) do |name|
-        name.starts_with?(prefix) ? name.lchop(prefix) : nil
+        top, _, rest = name.partition('/')
+        Config::RIND_TOP_DIRS.includes?(top) ? rest : nil
       end
       FileUtils.rm_rf(Config.rind_dir)
       File.rename(staging, Config.rind_dir)

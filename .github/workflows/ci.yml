@@ -7,22 +7,43 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: linux-x86_64
+          - os: ubuntu-24.04-arm
+            name: linux-arm64
+          - os: macos-latest
+            name: darwin-arm64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       # install-crystal apt-installs dev libraries; a stale package index 404s.
       - name: Refresh apt index
+        if: runner.os == 'Linux'
         run: sudo apt-get update -q
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
       - name: Check formatting
+        if: matrix.name == 'linux-x86_64'
         run: make lint
       - name: Run specs
         run: make spec
       - name: Build release binary
         run: make release
+      # Grows the rind for this platform and compiles a document that needs an aril.
+      - name: Compile a document
+        run: |
+          mkdir -p smoke
+          printf '%s\n' '\documentclass{article}' '\usepackage{booktabs,xcolor}' \
+            '\begin{document}' '\textcolor{blue}{Hello} from pomtex.' '\end{document}' > smoke/hello.tex
+          bin/pomtex --version
+          bin/pomtex build --rind smoke/hello.tex
+          test -s smoke/hello.pdf
       - uses: actions/upload-artifact@v4
         with:
-          name: pomtex-linux-x86_64
+          name: pomtex-${{ matrix.name }}
           path: bin/pomtex

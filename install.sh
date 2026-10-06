@@ -77,13 +77,13 @@ as_root() {
 }
 
 install_deb() {
-  pkg="pomtex_${version}-1_amd64.deb"
+  pkg="pomtex_${version}-1_${debarch}.deb"
   download "$pkg"
   as_root apt-get install -y "$tmp/$pkg"
 }
 
 install_rpm() {
-  pkg="pomtex-${version}-1.x86_64.rpm"
+  pkg="pomtex-${version}-1.${arch}.rpm"
   download "$pkg"
   if has zypper; then
     as_root zypper --non-interactive install --allow-unsigned-rpm "$tmp/$pkg"
@@ -96,7 +96,7 @@ install_rpm() {
 
 install_local() {
   prefix=${PREFIX:-$HOME/.local}
-  name="pomtex-$version-linux-x86_64"
+  name="pomtex-$version-linux-$arch"
   download "$name.tar.gz"
   tar -xzf "$tmp/$name.tar.gz" -C "$tmp"
   src="$tmp/$name"
@@ -118,10 +118,15 @@ install_local() {
 }
 
 main() {
-  [ "$(uname -s)" = Linux ] || die "only Linux is supported for now (see issue #8 for macOS)"
+  case $(uname -s) in
+    Linux) ;;
+    Darwin) die "on macOS, install with Homebrew: brew install Huseynteymurzade28/pomtex/pomtex" ;;
+    *) die "unsupported system: $(uname -s)" ;;
+  esac
   case $(uname -m) in
-    x86_64 | amd64) ;;
-    *) die "only x86_64 is supported for now (see issue #8 for arm64)" ;;
+    x86_64 | amd64) arch=x86_64 debarch=amd64 ;;
+    aarch64 | arm64) arch=aarch64 debarch=arm64 ;;
+    *) die "unsupported architecture: $(uname -m) (pomtex runs on x86_64 and aarch64)" ;;
   esac
 
   version=${POMTEX_VERSION:-$(latest_version)}
