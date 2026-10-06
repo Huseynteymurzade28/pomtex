@@ -17,3 +17,4 @@ examples/**/*.toc
 examples/**/*.nav
 examples/**/*.snm
 examples/**/*.pdf
+dist/

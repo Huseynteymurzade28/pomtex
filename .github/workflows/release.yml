@@ -33,16 +33,31 @@ jobs:
           bin/pomtex manpage > "dist/$name/share/pomtex.1"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
           (cd dist && sha256sum "$name.tar.gz" > "$name.tar.gz.sha256")
+
+      - name: Build .deb and .rpm
+        run: |
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_Linux_x86_64.tar.gz" | tar -xz -C "$RUNNER_TEMP" nfpm
+          version="${GITHUB_REF_NAME#v}"
+          cp -r "dist/pomtex-$version-linux-x86_64" dist/pkg
+          gzip -9n dist/pkg/share/pomtex.1
+          for packager in deb rpm; do
+            VERSION="$version" "$RUNNER_TEMP/nfpm" package -f packaging/nfpm.yaml -p "$packager" -t dist/
+          done
+          (cd dist && for f in *.deb *.rpm; do sha256sum "$f" > "$f.sha256"; done)
           cat dist/*.sha256
+        env:
+          NFPM_VERSION: "2.47.0"
 
       - name: Smoke test
         run: |
           file dist/pomtex-*/pomtex
           dist/pomtex-*/pomtex --version
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb
 
       - name: Publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.sha256 \
+          gh release create "$GITHUB_REF_NAME" dist/*.tar.gz dist/*.deb dist/*.rpm dist/*.sha256 \
             --title "pomtex $GITHUB_REF_NAME" --generate-notes

@@ -1,0 +1,55 @@
+# .deb and .rpm packages, built by .github/workflows/release.yml:
+#   VERSION=0.3.1 nfpm package -f packaging/nfpm.yaml -p deb -t dist/
+# dist/pkg is an unpacked release tarball with the man page already gzipped.
+name: pomtex
+arch: amd64
+platform: linux
+version: ${VERSION}
+release: 1
+section: tex
+priority: optional
+maintainer: Hüseyn Teymurzade <https://github.com/Huseynteymurzade28>
+description: |
+  On-demand LaTeX
+  A portable TeX kernel that installs CTAN packages only when a document
+  needs them. Static binary.
+vendor: pomtex
+homepage: https://github.com/Huseynteymurzade28/pomtex
+license: MIT
+
+overrides:
+  deb:
+    depends:
+      - xz-utils
+      - ca-certificates
+  rpm:
+    depends:
+      - xz
+      - ca-certificates
+
+contents:
+  - src: dist/pkg/pomtex
+    dst: /usr/bin/pomtex
+    file_info:
+      mode: 0755
+  - src: dist/pkg/share/pomtex.bash
+    dst: /usr/share/bash-completion/completions/pomtex
+  - src: dist/pkg/share/pomtex.fish
+    dst: /usr/share/fish/vendor_completions.d/pomtex.fish
+  # Debian's zsh only searches vendor-completions; Fedora and openSUSE use site-functions.
+  - src: dist/pkg/share/pomtex.zsh
+    dst: /usr/share/zsh/vendor-completions/_pomtex
+    packager: deb
+  - src: dist/pkg/share/pomtex.zsh
+    dst: /usr/share/zsh/site-functions/_pomtex
+    packager: rpm
+  - src: dist/pkg/share/pomtex.1.gz
+    dst: /usr/share/man/man1/pomtex.1.gz
+  - src: dist/pkg/README.md
+    dst: /usr/share/doc/pomtex/README.md
+  - src: dist/pkg/LICENSE
+    dst: /usr/share/doc/pomtex/copyright
+    packager: deb
+  - src: dist/pkg/LICENSE
+    dst: /usr/share/licenses/pomtex/LICENSE
+    packager: rpm
