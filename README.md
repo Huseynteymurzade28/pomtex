@@ -92,8 +92,8 @@ sudo zypper install --allow-unsigned-rpm ./pomtex-*.x86_64.rpm        # openSUSE
 ### Prebuilt binary
 
 ```sh
-curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.3.0-linux-x86_64.tar.gz | tar xz
-install -Dm755 pomtex-0.3.0-linux-x86_64/pomtex ~/.local/bin/pomtex
+curl -L https://github.com/Huseynteymurzade28/pomtex/releases/latest/download/pomtex-0.3.1-linux-x86_64.tar.gz | tar xz
+install -Dm755 pomtex-0.3.1-linux-x86_64/pomtex ~/.local/bin/pomtex
 ```
 
 The binary is statically linked and runs on any x86_64 Linux distribution.
