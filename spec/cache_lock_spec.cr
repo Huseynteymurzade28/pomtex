@@ -16,11 +16,20 @@ private def with_cache(&)
   end
 end
 
-# Runs `flock <mode> <file> sleep <seconds>` and waits until it holds the lock.
+# flock(2) from another process. The flock(1) command is util-linux only, so
+# perl stands in for it on macOS too.
+HOLD_LOCK = %q(open my $f, ">>", $ARGV[0] or die; flock($f, $ARGV[1] eq "-s" ? LOCK_SH : LOCK_EX) or die; select(undef, undef, undef, $ARGV[2]))
+TRY_LOCK  = %q(open my $f, ">>", $ARGV[0] or die; exit(flock($f, LOCK_EX | LOCK_NB) ? 0 : 1))
+
+private def lockable?(lock : String) : Bool
+  Process.run("perl", ["-MFcntl=:flock", "-e", TRY_LOCK, lock]).success?
+end
+
+# Holds `lock` in `mode` (-x or -s) for `seconds` in another process, once it has it.
 private def hold_in_other_process(lock : String, mode : String, seconds : Float64) : Process
   File.touch(lock)
-  holder = Process.new("flock", [mode, lock, "sleep", seconds.to_s])
-  until Process.run("flock", ["-n", "-x", lock, "true"]).success? == false
+  holder = Process.new("perl", ["-MFcntl=:flock", "-e", HOLD_LOCK, lock, mode, seconds.to_s])
+  while lockable?(lock)
     sleep 10.milliseconds
   end
   holder
@@ -75,7 +84,7 @@ describe Pomtex::Core::CacheLock do
     with_cache do |lock|
       expect_raises(Exception, "boom") { CacheLock.exclusive { raise "boom" } }
       CacheLock.held.should be_nil
-      Process.run("flock", ["-n", "-x", lock, "true"]).success?.should be_true
+      lockable?(lock).should be_true
     end
   end
 end
