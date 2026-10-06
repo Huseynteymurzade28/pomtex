@@ -25,7 +25,7 @@ jobs:
       - name: Check that the tag matches the version
         run: |
           shard="v$(awk '/^version:/ {print $2; exit}' shard.yml)"
-          code="v$(sed -n 's/.*VERSION = "\(.*\)"/\1/p' src/config.cr)"
+          code="v$(sed -n 's/^ *VERSION = "\(.*\)"/\1/p' src/config.cr)"
           echo "tag=$GITHUB_REF_NAME shard.yml=$shard config.cr=$code"
           test "$shard" = "$GITHUB_REF_NAME" && test "$code" = "$GITHUB_REF_NAME"
 
