@@ -75,10 +75,11 @@ curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/inst
 ### macOS (Homebrew)
 
 ```sh
-brew install Huseynteymurzade28/pomtex/pomtex
+brew tap Huseynteymurzade28/pomtex https://github.com/Huseynteymurzade28/pomtex
+brew install pomtex
 ```
 
-Homebrew builds pomtex from source and pulls in `xz`. Upgrade with `brew upgrade pomtex`.
+This repository is its own tap ([`Formula/pomtex.rb`](Formula/pomtex.rb)). Homebrew builds pomtex from source and pulls in `xz`. Upgrade with `brew upgrade pomtex`.
 
 ### Arch Linux (AUR)
 

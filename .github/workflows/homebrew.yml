@@ -1,0 +1,36 @@
+name: Homebrew
+
+# This repository doubles as a Homebrew tap (Formula/pomtex.rb):
+#   brew tap Huseynteymurzade28/pomtex https://github.com/Huseynteymurzade28/pomtex
+on:
+  push:
+    branches: [main]
+    paths: [Formula/**, .github/workflows/homebrew.yml]
+  pull_request:
+    paths: [Formula/**, .github/workflows/homebrew.yml]
+  workflow_dispatch:
+
+jobs:
+  formula:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tap this checkout
+        run: brew tap huseynteymurzade28/pomtex "$GITHUB_WORKSPACE"
+      - name: Audit
+        run: brew audit --strict --formula huseynteymurzade28/pomtex/pomtex
+      - name: Build from source
+        run: brew install --build-from-source huseynteymurzade28/pomtex/pomtex
+      - name: brew test
+        run: brew test huseynteymurzade28/pomtex/pomtex
+      - name: Compile a document
+        run: |
+          mkdir -p smoke && cd smoke
+          printf '%s\n' '\documentclass{article}' '\usepackage{booktabs}' \
+            '\begin{document}' 'Hello from Homebrew.' '\end{document}' > hello.tex
+          pomtex build --rind hello.tex
+          test -s hello.pdf

@@ -120,7 +120,7 @@ install_local() {
 main() {
   case $(uname -s) in
     Linux) ;;
-    Darwin) die "on macOS, install with Homebrew: brew install Huseynteymurzade28/pomtex/pomtex" ;;
+    Darwin) die "on macOS, install with Homebrew: brew tap $REPO https://github.com/$REPO && brew install pomtex" ;;
     *) die "unsupported system: $(uname -s)" ;;
   esac
   case $(uname -m) in
