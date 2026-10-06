@@ -59,11 +59,34 @@ independent seeds. The CLI output uses the same terms:
 
 ## Installation
 
+### Any Linux distribution (install script)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | sh
+```
+
+On Debian and Ubuntu the script installs the `.deb`, on Fedora and openSUSE the `.rpm` (both through the system package manager, so it asks for `sudo`). Elsewhere it puts the static binary, completions and man page under `~/.local`. Run it again to update. Options go before `sh`:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | POMTEX_LOCAL=1 sh   # no sudo, ~/.local
+curl -fsSL https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.sh | PREFIX=/opt/pomtex sh
+```
+
 ### Arch Linux (AUR)
 
 ```sh
 yay -S pomtex-bin     # prebuilt static binary
 yay -S pomtex         # build from source
+```
+
+### Debian, Ubuntu, Fedora, openSUSE (packages)
+
+The [latest release](https://github.com/Huseynteymurzade28/pomtex/releases/latest) has a `.deb` and an `.rpm`:
+
+```sh
+sudo apt install ./pomtex_*_amd64.deb                                 # Debian, Ubuntu
+sudo dnf install ./pomtex-*.x86_64.rpm                                # Fedora
+sudo zypper install --allow-unsigned-rpm ./pomtex-*.x86_64.rpm        # openSUSE
 ```
 
 ### Prebuilt binary

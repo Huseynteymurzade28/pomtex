@@ -51,17 +51,20 @@ module Pomtex::Core
 
     # How this binary was installed decides how to update it.
     def upgrade_hint(executable : String? = Process.executable_path) : String
-      if executable && (package = pacman_owner(executable))
+      if executable && (package = owner(executable, "pacman", ["-Qqo"]))
         "yay -S #{package}"
+      elsif executable && (owner(executable, "dpkg-query", ["-S"]) || owner(executable, "rpm", ["-qf"]))
+        "curl -fsSL https://raw.githubusercontent.com/#{Config::REPO}/main/install.sh | sh"
       else
         "https://github.com/#{Config::REPO}/releases/latest"
       end
     end
 
-    private def pacman_owner(path : String) : String?
-      pacman = Process.find_executable("pacman") || return nil
+    # The package that owns `path` according to a package manager's query command.
+    private def owner(path : String, command : String, args : Array(String)) : String?
+      program = Process.find_executable(command) || return nil
       output = IO::Memory.new
-      status = Process.run(pacman, ["-Qqo", path], output: output, error: Process::Redirect::Close)
+      status = Process.run(program, args + [path], output: output, error: Process::Redirect::Close)
       status.success? ? output.to_s.strip.presence : nil
     end
 
