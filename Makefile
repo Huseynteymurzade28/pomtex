@@ -5,7 +5,7 @@ BIN     := bin/pomtex
 SOURCES := $(shell find src -name '*.cr')
 
 # Static builds need musl; the official Alpine image ships static libs for
-# OpenSSL, zlib, PCRE2 and libgc.
+# OpenSSL, zlib, liblzma, PCRE2 and libgc.
 STATIC_IMAGE ?= crystallang/crystal:latest-alpine
 
 .PHONY: all build release static static-native spec fmt lint extras examples install uninstall clean
@@ -26,7 +26,7 @@ release: $(SOURCES)
 static:
 	@mkdir -p bin
 	docker run --rm -v $(CURDIR):/src -w /src $(STATIC_IMAGE) \
-	  sh -c 'apk add --no-cache openssl-libs-static zlib-static && \
+	  sh -c 'apk add --no-cache openssl-libs-static zlib-static xz-static && \
 	         crystal build src/pomtex.cr -o $(BIN) --release --no-debug --static && \
 	         strip $(BIN) && chown $(shell id -u):$(shell id -g) $(BIN)'
 	@file $(BIN) 2>/dev/null || true

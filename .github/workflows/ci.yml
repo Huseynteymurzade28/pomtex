@@ -21,9 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # install-crystal apt-installs dev libraries; a stale package index 404s.
-      - name: Refresh apt index
+      - name: Refresh apt index and install liblzma
         if: runner.os == 'Linux'
-        run: sudo apt-get update -q
+        run: sudo apt-get update -q && sudo apt-get install -qy liblzma-dev
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest

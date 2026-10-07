@@ -1,11 +1,12 @@
 require "compress/gzip"
 require "../config"
+require "./xz"
 
 module Pomtex::Seed
   # Streams tar archives (.tar, .tar.gz, .tar.xz) straight into a target tree.
   #
-  # The tar reader is implemented here (ustar + GNU long names + PAX paths) so the
-  # only external dependency is `xz` for LZMA streams; gzip is handled natively.
+  # The tar reader is implemented here (ustar + GNU long names + PAX paths); xz
+  # goes through liblzma and gzip through the stdlib, so no external tools run.
   module Extractor
     extend self
 
@@ -62,21 +63,13 @@ module Pomtex::Seed
     # Yields an IO over the decompressed tar stream.
     def with_decompressed(path : String, & : IO ->) : Nil
       if path.ends_with?(".xz") || path.ends_with?(".txz")
-        xz = Process.find_executable("xz") || raise Error.new("`xz` is required to unpack #{File.basename(path)}")
-        error = IO::Memory.new
-        process = Process.new(xz, ["-dc", path], output: Process::Redirect::Pipe, error: error)
-        begin
-          yield process.output
-          # Drain whatever follows the end-of-archive marker so xz can exit cleanly.
-          IO.copy(process.output, IO::Memory.new) rescue nil
-        rescue ex
-          # Closing first keeps xz from blocking on a full pipe when we bail early.
-          process.output.close rescue nil
-          process.wait
-          raise ex
+        File.open(path) do |file|
+          XZ::Reader.open(file) do |xz|
+            yield xz
+            # Decode past the end-of-archive marker so the stream checksums are verified.
+            xz.skip_to_end
+          end
         end
-        status = process.wait
-        raise Error.new("xz failed on #{File.basename(path)}: #{error.to_s.strip}") unless status.success?
       elsif path.ends_with?(".gz") || path.ends_with?(".tgz")
         File.open(path) { |file| Compress::Gzip::Reader.open(file) { |gzip| yield gzip } }
       else

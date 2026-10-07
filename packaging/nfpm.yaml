@@ -20,11 +20,9 @@ license: MIT
 overrides:
   deb:
     depends:
-      - xz-utils
       - ca-certificates
   rpm:
     depends:
-      - xz
       - ca-certificates
 
 contents:
