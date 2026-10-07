@@ -10,8 +10,11 @@ module Pomtex::Seed
   #     packages ─▶ [jobs] ─▶ N download fibers ─▶ [ready] ─▶ unpack fibers ─▶ [results]
   class ArilFetcher
     MAX_REDIRECTS = 8
-    USER_AGENT    = "pomtex/#{VERSION} (+https://ctan.org)"
-    UNPACKERS     = 2
+    # mirror.ctan.org sends each request to a mirror of its choosing, so a retry
+    # usually lands on a different one when the first is broken.
+    ATTEMPTS   = 3
+    USER_AGENT = "pomtex/#{VERSION} (+https://ctan.org)"
+    UNPACKERS  = 2
 
     record Outcome,
       package : Package,
@@ -95,9 +98,23 @@ module Pomtex::Seed
     end
 
     # Streams `url` to `dest` (via a .part file), following redirects and
-    # verifying the SHA-512 when one is given. Returns the byte count.
+    # verifying the SHA-512 when one is given; retries from `url` on failure.
+    # Returns the byte count.
     def self.stream(url : String, dest : Path, sha512 : String? = nil,
                     progress : Proc(Int64, Int64?, Nil)? = nil) : Int64
+      attempt = 1
+      loop do
+        return stream_once(url, dest, sha512, progress)
+      rescue ex : Error
+        raise ex if attempt >= ATTEMPTS
+        UI.debug "#{ex.message}; retrying (#{attempt}/#{ATTEMPTS - 1})"
+        sleep (attempt * 500).milliseconds
+        attempt += 1
+      end
+    end
+
+    private def self.stream_once(url : String, dest : Path, sha512 : String?,
+                                 progress : Proc(Int64, Int64?, Nil)?) : Int64
       part = Path["#{dest}.part"]
       current = URI.parse(url)
       headers = HTTP::Headers{"User-Agent" => USER_AGENT}
@@ -140,6 +157,9 @@ module Pomtex::Seed
           end
           File.rename(part, dest)
           return written
+        rescue ex : IO::Error | Socket::Error | OpenSSL::Error
+          # Name the mirror: with mirror.ctan.org it is not the host that was asked.
+          raise Error.new("#{current.host}: #{ex.message}")
         ensure
           client.close
           File.delete?(part)
