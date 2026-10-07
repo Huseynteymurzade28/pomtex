@@ -147,7 +147,6 @@ main() {
     install_local
   fi
 
-  has xz || say "warning: xz is not installed; pomtex needs it to unpack TeX Live packages"
   say "done: $("${prefix:-/usr}/bin/pomtex" --version 2>/dev/null || echo "pomtex $version")"
 }
 

@@ -302,8 +302,8 @@ module Pomtex
         puts "index       not built yet (built on first miss)"
       end
       puts "arils       #{Seed::Manifest.entries.size} planted"
-      puts "xz          #{Process.find_executable("xz") || "MISSING — required to unpack arils"}"
-      Process.find_executable("xz") ? 0 : 1
+      puts "xz          liblzma #{String.new(LibLZMA.version_string)}"
+      0
     end
 
     private def completions_command : Int32

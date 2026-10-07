@@ -118,7 +118,6 @@ make install          # installs to ~/.local/bin
 
 ### Runtime requirements
 
-- `xz`, used to unpack TeX Live packages. It is preinstalled on almost every distribution.
 - An internet connection the first time a package is needed.
 
 ## Examples
@@ -296,7 +295,7 @@ flowchart LR
 1. **Detection.** Use the system `pdflatex` and `kpsewhich` if present. Otherwise use the pomtex kernel, downloading it first if necessary (TinyTeX-1, about 51 MB).
 2. **Scanning.** Parse the document and every local file it includes, with comments removed.
 3. **Resolution.** The first time something is missing, pomtex downloads `texlive.tlpdb` (2.7 MB) and builds an index of about 185,000 files across 4,900 packages. It maps each missing file to a package, then checks that package's dependencies layer by layer with batched `kpsewhich` calls. It then scans the newly installed package files and follows their top-level `\RequirePackage`, `\input` and library loads until nothing new turns up. Loads nested inside braces are skipped because they are usually conditional.
-4. **Download and unpack.** `tlnet/archive/<package>.tar.xz` is streamed and its SHA-512 verified. It is then unpacked by a built-in tar reader that rejects path traversal.
+4. **Download and unpack.** `tlnet/archive/<package>.tar.xz` is streamed and its SHA-512 verified. It is then decompressed with liblzma and unpacked by a built-in tar reader that rejects path traversal.
 5. **Compilation.** The engine runs with the package tree added to its search paths (`TEXINPUTS`, `TEXMFAUXTREES`). It also gets a fontconfig file for XeTeX and the font map files needed by pdfTeX.
 6. **Recovery.** pomtex reads the log, installs any packages that are still missing and compiles again, for up to 8 rounds.
 7. **Bibliography and passes.** If the citations, `.bib` files or `.bbl` changed, pomtex runs BibTeX or Biber, then reruns LaTeX for cross-references, up to 3 passes.

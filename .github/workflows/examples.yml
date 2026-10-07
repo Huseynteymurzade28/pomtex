@@ -22,8 +22,8 @@ jobs:
       POMTEX_HOME: ${{ github.workspace }}/.pomtex
     steps:
       - uses: actions/checkout@v4
-      - name: Refresh apt index
-        run: sudo apt-get update -q
+      - name: Refresh apt index and install liblzma
+        run: sudo apt-get update -q && sudo apt-get install -qy liblzma-dev
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
