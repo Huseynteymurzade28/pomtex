@@ -8,7 +8,7 @@ SOURCES := $(shell find src -name '*.cr')
 # OpenSSL, zlib, PCRE2 and libgc.
 STATIC_IMAGE ?= crystallang/crystal:latest-alpine
 
-.PHONY: all build release static static-native spec fmt lint extras install uninstall clean
+.PHONY: all build release static static-native spec fmt lint extras examples install uninstall clean
 
 all: build
 
@@ -67,3 +67,7 @@ uninstall:
 
 clean:
 	rm -rf bin share .crystal
+
+# Compile every document in examples/ with the rind (network required).
+examples: release
+	sh scripts/build-examples.sh

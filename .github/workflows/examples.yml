@@ -1,0 +1,56 @@
+name: Examples
+
+# Compiles examples/ end to end against live CTAN: bootstrap, index build,
+# concurrent fetch, the runtime guard and all three engines. Nightly runs also
+# catch upstream changes such as renamed packages or a new TeX Live year.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "src/**"
+      - "examples/**"
+      - "scripts/build-examples.sh"
+      - ".github/workflows/examples.yml"
+
+jobs:
+  examples:
+    runs-on: ubuntu-latest
+    env:
+      # A fresh home per run, so every build starts from an empty texmf/.
+      POMTEX_HOME: ${{ github.workspace }}/.pomtex
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refresh apt index
+        run: sudo apt-get update -q
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      - name: Build release binary
+        run: make release
+
+      - name: Resolve the TinyTeX release
+        run: |
+          tag=$(gh api repos/rstudio/tinytex-releases/releases/latest --jq .tag_name)
+          echo "POMTEX_RIND_VERSION=$tag" >> "$GITHUB_ENV"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Cache the rind
+        uses: actions/cache@v4
+        with:
+          path: .pomtex/rind
+          key: rind-${{ runner.os }}-${{ runner.arch }}-${{ env.POMTEX_RIND_VERSION }}
+
+      - name: Compile examples
+        run: sh scripts/build-examples.sh
+
+      - name: Upload PDFs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: examples
+          path: |
+            examples/**/*.pdf
+            examples/**/*.log
+          if-no-files-found: ignore
