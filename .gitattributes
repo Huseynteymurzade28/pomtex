@@ -1,0 +1,2 @@
+# Specs embed fixtures in heredocs; CRLF checkouts on Windows would change them.
+* text=auto eol=lf

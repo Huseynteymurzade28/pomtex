@@ -122,7 +122,7 @@ describe "Pomtex::Seed::Scanner assets" do
       File.write(dir.join("code", "main.c"), "")
       File.write(dir.join("commented.png"), "")
 
-      assets = Pomtex::Seed::Scanner.scan(dir.join("main.tex")).assets.map(&.relative_to(dir).to_s)
+      assets = Pomtex::Seed::Scanner.scan(dir.join("main.tex")).assets.map(&.relative_to(dir).to_posix.to_s)
       # extra.bib does not exist, so it is not watched
       assets.sort.should eq ["chapters/more.bib", "chapters/plot.png", "code/main.c", "fig/logo.pdf", "refs.bib"]
     end
