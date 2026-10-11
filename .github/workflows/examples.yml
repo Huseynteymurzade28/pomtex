@@ -19,7 +19,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            exe: ""
+          - os: windows-latest
+            exe: .exe
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -27,7 +31,7 @@ jobs:
     env:
       # A fresh home per run, so every build starts from an empty texmf/.
       POMTEX_HOME: ${{ github.workspace }}/.pomtex
-      POMTEX: bin/pomtex${{ runner.os == 'Windows' && '.exe' || '' }}
+      POMTEX: bin/pomtex${{ matrix.exe }}
     steps:
       - uses: actions/checkout@v4
       - name: Refresh apt index and install liblzma
