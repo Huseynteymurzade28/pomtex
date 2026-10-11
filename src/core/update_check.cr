@@ -52,6 +52,7 @@ module Pomtex::Core
     # How this binary was installed decides how to update it.
     def upgrade_hint(executable : String? = Process.executable_path) : String
       {% if flag?(:win32) %}
+        return "scoop update pomtex" if executable && scoop?(executable)
         return "irm https://raw.githubusercontent.com/#{Config::REPO}/main/install.ps1 | iex"
       {% end %}
       if executable && (package = owner(executable, "pacman", ["-Qqo"]))
@@ -68,6 +69,11 @@ module Pomtex::Core
     # Homebrew links bin/pomtex to its Cellar/pomtex/<version>/bin/pomtex.
     def homebrew?(path : String) : Bool
       (File.realpath(path) rescue path).includes?("/Cellar/pomtex/")
+    end
+
+    # Scoop keeps apps in <scoop>\apps\<app>\<version>; its shims run them from there.
+    def scoop?(path : String) : Bool
+      path.downcase.tr("\\", "/").includes?("/scoop/apps/pomtex/")
     end
 
     # The package that owns `path` according to a package manager's query command.

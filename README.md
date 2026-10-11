@@ -80,9 +80,18 @@ brew install huseynteymurzade28/tap/pomtex
 
 The formula lives in [homebrew-tap](https://github.com/Huseynteymurzade28/homebrew-tap), which picks up new releases on its own. Homebrew builds pomtex from source and pulls in `xz`. Upgrade with `brew upgrade pomtex`.
 
+### Windows (Scoop)
+
+```powershell
+scoop bucket add huseynteymurzade28 https://github.com/Huseynteymurzade28/scoop-bucket
+scoop install huseynteymurzade28/pomtex
+```
+
+The manifest lives in [scoop-bucket](https://github.com/Huseynteymurzade28/scoop-bucket), which picks up new releases on its own. Upgrade with `scoop update pomtex`.
+
 ### Windows (install script)
 
-In PowerShell:
+Without Scoop, in PowerShell:
 
 ```powershell
 irm https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.ps1 | iex

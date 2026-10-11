@@ -17,6 +17,10 @@ describe Pomtex::Core::UpdateCheck do
   end
 
   {% if flag?(:win32) %}
+    it "recognises Scoop installs" do
+      Pomtex::Core::UpdateCheck.upgrade_hint(%q(C:\Users\u\scoop\apps\pomtex\0.4.0\pomtex.exe)).should eq "scoop update pomtex"
+    end
+
     it "points Windows installs at install.ps1" do
       Pomtex::Core::UpdateCheck.upgrade_hint("C:/nonexistent/pomtex.exe").should eq "irm https://raw.githubusercontent.com/Huseynteymurzade28/pomtex/main/install.ps1 | iex"
     end
