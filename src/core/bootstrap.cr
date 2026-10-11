@@ -37,9 +37,13 @@ module Pomtex::Core
 
       staging = Path["#{Config.rind_dir}.staging"]
       FileUtils.rm_rf(staging)
-      Seed::Extractor.extract(archive, staging) do |name|
-        top, _, rest = name.partition('/')
-        Config::RIND_TOP_DIRS.includes?(top) ? rest : nil
+      if archive.extension == ".exe"
+        self_extract(archive, staging)
+      else
+        Seed::Extractor.extract(archive, staging) do |name|
+          top, _, rest = name.partition('/')
+          Config::RIND_TOP_DIRS.includes?(top) ? rest : nil
+        end
       end
       FileUtils.rm_rf(Config.rind_dir)
       File.rename(staging, Config.rind_dir)
@@ -66,8 +70,24 @@ module Pomtex::Core
       Config::RIND_PINNED_VERSION
     end
 
+    # The Windows bundle is a 7-Zip self-extractor: `-y` unpacks `TinyTeX/` into
+    # the working directory without asking, as TinyTeX's own installer runs it.
+    private def self_extract(archive : Path, staging : Path) : Nil
+      unpack = Path["#{staging}.unpack"]
+      FileUtils.rm_rf(unpack)
+      Dir.mkdir_p(unpack)
+      output = IO::Memory.new
+      status = Process.run(archive.to_s, ["-y"], chdir: unpack.to_s, output: output, error: output)
+      raise Error.new("could not unpack #{archive.basename}: #{output.to_s.lines.last?}") unless status.success?
+      top = Config::RIND_TOP_DIRS.map { |name| unpack.join(name) }.find { |dir| Dir.exists?(dir) } ||
+            raise Error.new("#{archive.basename} has no TinyTeX directory")
+      File.rename(top, staging)
+    ensure
+      FileUtils.rm_rf(unpack) if unpack
+    end
+
     private def verify! : Nil
-      pdflatex = Config.rind_bin_dir.join("pdflatex")
+      pdflatex = Config.rind_bin_dir.join(Config.executable_name("pdflatex"))
       output = IO::Memory.new
       status = Process.run(pdflatex.to_s, ["--version"], output: output, error: output)
       raise Error.new("rind self-test failed: #{output.to_s.lines.first?}") unless status.success?

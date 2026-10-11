@@ -62,20 +62,22 @@ end
 
 describe Pomtex::Engine::Runner do
   it "reads inputs from the -recorder log, minus files the job also writes" do
+    # TeX on Windows records absolute paths with a drive letter and forward slashes.
+    root = {{ flag?(:win32) ? "C:" : "" }}
     fls = <<-FLS
-      PWD /home/u/thesis
-      INPUT /opt/tex/texmf-dist/tex/latex/base/article.cls
+      PWD #{root}/home/u/thesis
+      INPUT #{root}/opt/tex/texmf-dist/tex/latex/base/article.cls
       INPUT ./thesis.tex
       INPUT thesis.tex
       INPUT ./fig/logo.pdf
-      INPUT /home/u/thesis/build/thesis.aux
-      OUTPUT /home/u/thesis/build/thesis.aux
-      OUTPUT /home/u/thesis/build/thesis.log
+      INPUT #{root}/home/u/thesis/build/thesis.aux
+      OUTPUT #{root}/home/u/thesis/build/thesis.aux
+      OUTPUT #{root}/home/u/thesis/build/thesis.log
       FLS
-    Pomtex::Engine::Runner.recorded_inputs(fls).map(&.to_s).should eq [
-      "/opt/tex/texmf-dist/tex/latex/base/article.cls",
-      "/home/u/thesis/thesis.tex",
-      "/home/u/thesis/fig/logo.pdf",
+    Pomtex::Engine::Runner.recorded_inputs(fls).map(&.to_posix.to_s).should eq [
+      "#{root}/opt/tex/texmf-dist/tex/latex/base/article.cls",
+      "#{root}/home/u/thesis/thesis.tex",
+      "#{root}/home/u/thesis/fig/logo.pdf",
     ]
   end
 end

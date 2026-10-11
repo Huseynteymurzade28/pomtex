@@ -26,6 +26,7 @@ module Pomtex::Seed
       Dir.mkdir_p(dest)
       root = File.realpath(dest)
       written = [] of String
+      links = [] of {String, String}
       with_decompressed(archive.to_s) do |io|
         each_entry(io) do |entry, data|
           name = rename.call(entry.name)
@@ -39,8 +40,14 @@ module Pomtex::Seed
           when '2'
             prepare_parent(root, target)
             File.delete(target) if File.symlink?(target) || File.file?(target)
-            File.symlink(entry.link, target)
-            written << relative
+            {% if flag?(:win32) %}
+              # Symlinks need Developer Mode or admin rights on Windows: they
+              # become copies of their target once the whole archive is unpacked.
+              links << {relative, entry.link}
+            {% else %}
+              File.symlink(entry.link, target)
+              written << relative
+            {% end %}
           when '1'
             source = sanitize(rename.call(entry.link) || "")
             next unless source
@@ -57,7 +64,26 @@ module Pomtex::Seed
           end
         end
       end
+      copy_links(root, links, written)
       written
+    end
+
+    # Copies each link's target to the link's place, inside the tree only; a
+    # link to another link resolves once that one has been copied.
+    private def copy_links(root : String, links : Array({String, String}), written : Array(String)) : Nil
+      pending = links
+      until pending.empty?
+        left = pending.reject do |relative, link|
+          source = sanitize(Path.posix(relative).parent.join(link).normalize.to_s)
+          next true unless source # points outside the tree
+          next false unless File.file?(Path[root].join(source))
+          File.copy(Path[root].join(source), Path[root].join(relative))
+          written << relative
+          true
+        end
+        break if left.size == pending.size # dangling or circular
+        pending = left
+      end
     end
 
     # Yields an IO over the decompressed tar stream.
@@ -121,6 +147,10 @@ module Pomtex::Seed
     def sanitize(name : String) : String?
       parts = name.split('/').reject { |part| part.empty? || part == "." }
       return nil if parts.empty? || parts.any?("..") || name.starts_with?('/')
+      # Backslashes and drive letters are path syntax on Windows.
+      {% if flag?(:win32) %}
+        return nil if parts.any? { |part| part.includes?('\\') || part.includes?(':') }
+      {% end %}
       parts.join('/')
     end
 
@@ -128,7 +158,7 @@ module Pomtex::Seed
       parent = target.parent
       Dir.mkdir_p(parent)
       real = File.realpath(parent)
-      unless real == root || real.starts_with?(root + "/")
+      unless real == root || Config.inside?(real, root)
         raise Error.new("refusing to write outside #{root}: #{target}")
       end
     end

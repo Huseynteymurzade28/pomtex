@@ -94,7 +94,8 @@ describe Pomtex::Core::Toolchain do
     end
   end
 
-  it "falls back to the engine's version banner" do
+  # The stand-in engine is a shell script.
+  it_unix "falls back to the engine's version banner" do
     with_tmpdir do |dir|
       script = dir.join("pdftex")
       File.write(script, "#!/bin/sh\necho 'pdfTeX 3.141592653-2.6-1.40.27 (TeX Live 2024/Debian)'\n")

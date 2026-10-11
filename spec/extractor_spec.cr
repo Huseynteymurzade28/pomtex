@@ -26,8 +26,13 @@ describe Pomtex::Seed::Extractor do
         written.should contain(long)
         written.any?(&.starts_with?("tlpkg/")).should be_false
         File.read(dest.join(long)).should eq "\\ProvidesPackage{file}"
-        File.info(dest.join("tex/run.sh")).permissions.owner_execute?.should be_true
-        File.readlink(dest.join("tex/link.sh")).should eq "run.sh"
+        {% if flag?(:win32) %}
+          # No execute bits, and symlinks become copies of their target.
+          File.read(dest.join("tex/link.sh")).should eq "#!/bin/sh"
+        {% else %}
+          File.info(dest.join("tex/run.sh")).permissions.owner_execute?.should be_true
+          File.readlink(dest.join("tex/link.sh")).should eq "run.sh"
+        {% end %}
       end
     end
   end

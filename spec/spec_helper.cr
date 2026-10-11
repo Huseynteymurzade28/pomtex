@@ -20,3 +20,12 @@ def with_tmpdir(&)
     FileUtils.rm_rf(dir)
   end
 end
+
+# An example that only runs on Unix; pending on Windows.
+macro it_unix(description, &block)
+  {% if flag?(:win32) %}
+    pending({{description}}) { }
+  {% else %}
+    it({{description}}) {{block}}
+  {% end %}
+end

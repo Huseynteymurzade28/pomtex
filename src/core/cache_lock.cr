@@ -58,6 +58,11 @@ module Pomtex::Core
 
     private def acquire(mode : Mode) : Nil
       file = (@@file ||= open_lock_file)
+      # LockFileEx stacks locks instead of converting them: a shared lock would
+      # block our own exclusive one, so drop it first (as flock does when waiting).
+      {% if flag?(:win32) %}
+        file.flock_unlock if @@mode
+      {% end %}
       begin
         lock(file, mode, blocking: false)
       rescue IO::Error

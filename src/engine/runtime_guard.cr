@@ -237,7 +237,7 @@ module Pomtex::Engine
       if found = toolchain.executable(name)
         return found
       end
-      planted = Config.aril_bin_dir.join(name)
+      planted = Config.aril_bin_dir.join(Config.executable_name(name))
       return planted.to_s if File::Info.executable?(planted)
       if toolchain.origin.system? && (found = Process.find_executable(name))
         return found
@@ -293,7 +293,7 @@ module Pomtex::Engine
 
     private def aril_file?(path : String) : Bool
       root = (@aril_root ||= File.realpath(Config.texmf_dir) rescue Config.texmf_dir.to_s)
-      path.starts_with?(root + "/")
+      Config.inside?(path, root)
     end
 
     @aril_root : String? = nil

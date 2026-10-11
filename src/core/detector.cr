@@ -17,7 +17,7 @@ module Pomtex::Core
     end
 
     def executable(name : String) : String?
-      candidate = bin_dir.join(name)
+      candidate = bin_dir.join(Config.executable_name(name))
       File::Info.executable?(candidate) ? candidate.to_s : nil
     end
 
@@ -97,14 +97,15 @@ module Pomtex::Core
 
       # Resolve symlinks (e.g. /usr/bin/pdflatex -> pdftex) only for the directory.
       bin = Path[pdflatex].parent
-      return nil unless Path[kpsewhich].parent == bin || File::Info.executable?(bin.join("kpsewhich"))
+      return nil unless Path[kpsewhich].parent == bin || File::Info.executable?(bin.join(Config.executable_name("kpsewhich")))
       Toolchain.new(Toolchain::Origin::System, bin)
     end
 
     def rind_toolchain : Toolchain?
       bin = Config.rind_bin_dir
-      return nil unless File::Info.executable?(bin.join("pdflatex")) && File::Info.executable?(bin.join("kpsewhich"))
-      Toolchain.new(Toolchain::Origin::Rind, bin)
+      toolchain = Toolchain.new(Toolchain::Origin::Rind, bin)
+      return nil unless toolchain.executable("pdflatex") && toolchain.executable("kpsewhich")
+      toolchain
     end
 
     def rind_present? : Bool

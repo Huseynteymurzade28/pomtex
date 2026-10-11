@@ -16,19 +16,40 @@ on:
 
 jobs:
   examples:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            exe: ""
+          - os: windows-latest
+            exe: .exe
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     env:
       # A fresh home per run, so every build starts from an empty texmf/.
       POMTEX_HOME: ${{ github.workspace }}/.pomtex
+      POMTEX: bin/pomtex${{ matrix.exe }}
     steps:
       - uses: actions/checkout@v4
       - name: Refresh apt index and install liblzma
+        if: runner.os == 'Linux'
         run: sudo apt-get update -q && sudo apt-get install -qy liblzma-dev
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
+      - name: Install liblzma
+        if: runner.os == 'Windows'
+        run: |
+          "$VCPKG_INSTALLATION_ROOT/vcpkg" install liblzma:x64-windows-static
+          lib="$(cygpath -w "$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/lib")"
+          echo "CRYSTAL_LIBRARY_PATH=$(crystal env CRYSTAL_LIBRARY_PATH);$lib" >> "$GITHUB_ENV"
       - name: Build release binary
-        run: make release
+        run: |
+          mkdir -p bin
+          crystal build src/pomtex.cr -o "$POMTEX" --release --no-debug ${{ runner.os == 'Windows' && '--static' || '' }}
 
       - name: Resolve the TinyTeX release
         run: |
@@ -49,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: examples
+          name: examples-${{ runner.os }}
           path: |
             examples/**/*.pdf
             examples/**/*.log
