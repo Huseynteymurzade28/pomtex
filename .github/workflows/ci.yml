@@ -78,6 +78,26 @@ jobs:
           bin/pomtex.exe --version
           bin/pomtex.exe build --rind smoke/hello.tex
           test -s smoke/hello.pdf
+      # install.ps1 from a zip laid out like the release one, into a fresh PATH entry.
+      - name: Install script
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory dist/pomtex-ci-windows-x86_64 | Out-Null
+          Copy-Item bin/pomtex.exe, README.md, LICENSE dist/pomtex-ci-windows-x86_64/
+          Compress-Archive dist/pomtex-ci-windows-x86_64 dist/pomtex-ci.zip
+          $env:POMTEX_ZIP = "$PWD/dist/pomtex-ci.zip"
+          $env:POMTEX_INSTALL_DIR = "$env:RUNNER_TEMP\pomtex-bin"
+          ./install.ps1
+          pomtex --version
+          if (([Environment]::GetEnvironmentVariable('Path', 'User') -split ';') -notcontains $env:POMTEX_INSTALL_DIR) { throw 'PATH not updated' }
+      # The way most people run it: Windows PowerShell 5.1, piped into iex.
+      - name: Install script (Windows PowerShell, iex)
+        shell: powershell
+        run: |
+          $env:POMTEX_ZIP = "$PWD/dist/pomtex-ci.zip"
+          $env:POMTEX_INSTALL_DIR = "$env:RUNNER_TEMP\pomtex-bin-51"
+          Get-Content ./install.ps1 -Raw | Invoke-Expression
+          & "$env:POMTEX_INSTALL_DIR\pomtex.exe" --version
       - uses: actions/upload-artifact@v4
         with:
           name: pomtex-windows-x86_64

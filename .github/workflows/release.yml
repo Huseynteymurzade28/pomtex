@@ -73,8 +73,51 @@ jobs:
             dist/*.rpm
             dist/*.sha256
 
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      # Crystal's Windows package ships every static library pomtex links except liblzma.
+      - name: Install liblzma
+        run: |
+          "$VCPKG_INSTALLATION_ROOT/vcpkg" install liblzma:x64-windows-static
+          lib="$(cygpath -w "$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/lib")"
+          echo "CRYSTAL_LIBRARY_PATH=$(crystal env CRYSTAL_LIBRARY_PATH);$lib" >> "$GITHUB_ENV"
+
+      # Statically linked, including the C runtime: only system DLLs are needed.
+      - name: Build static binary
+        run: |
+          mkdir -p bin
+          crystal build src/pomtex.cr -o bin/pomtex.exe --release --no-debug --static
+
+      - name: Package
+        run: |
+          name="pomtex-${GITHUB_REF_NAME#v}-windows-x86_64"
+          mkdir -p "dist/$name"
+          cp bin/pomtex.exe README.md LICENSE "dist/$name/"
+          (cd dist && 7z a -tzip -bso0 "$name.zip" "$name" && sha256sum "$name.zip" > "$name.zip.sha256")
+
+      - name: Smoke test
+        run: |
+          dist/pomtex-*/pomtex.exe --version
+          # Only system DLLs (no vcruntime140.dll), so it runs on a fresh Windows.
+          objdump -p dist/pomtex-*/pomtex.exe | grep "DLL Name" | sort || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-windows
+          path: |
+            dist/*.zip
+            dist/*.sha256
+
   publish:
-    needs: static-linux
+    needs: [static-linux, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
