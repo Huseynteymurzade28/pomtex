@@ -47,3 +47,38 @@ jobs:
         with:
           name: pomtex-${{ matrix.name }}
           path: bin/pomtex
+
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      # Crystal's Windows package ships every static library pomtex links except liblzma.
+      - name: Install liblzma
+        run: |
+          "$VCPKG_INSTALLATION_ROOT/vcpkg" install liblzma:x64-windows-static
+          lib="$(cygpath -w "$VCPKG_INSTALLATION_ROOT/installed/x64-windows-static/lib")"
+          echo "CRYSTAL_LIBRARY_PATH=$(crystal env CRYSTAL_LIBRARY_PATH);$lib" >> "$GITHUB_ENV"
+      - name: Run specs
+        run: crystal spec
+      - name: Build release binary
+        run: |
+          mkdir -p bin
+          crystal build src/pomtex.cr -o bin/pomtex.exe --release --no-debug --static
+      - name: Compile a document
+        run: |
+          mkdir -p smoke
+          printf '%s\n' '\documentclass{article}' '\usepackage{booktabs,xcolor}' \
+            '\begin{document}' '\textcolor{blue}{Hello} from pomtex.' '\end{document}' > smoke/hello.tex
+          bin/pomtex.exe --version
+          bin/pomtex.exe build --rind smoke/hello.tex
+          test -s smoke/hello.pdf
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pomtex-windows-x86_64
+          path: bin/pomtex.exe

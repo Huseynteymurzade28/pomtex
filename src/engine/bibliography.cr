@@ -56,8 +56,9 @@ module Pomtex::Engine
       status =
         if tool.bibtex?
           # bibtex runs next to the .aux; local .bib/.bst files live with the source.
-          env["BIBINPUTS"] = "#{source_dir}:#{ENV["BIBINPUTS"]? || ""}"
-          env["BSTINPUTS"] = "#{source_dir}:#{ENV["BSTINPUTS"]? || ""}"
+          dir = Config.tex_path(source_dir)
+          env["BIBINPUTS"] = "#{dir}#{Config::PATH_SEPARATOR}#{ENV["BIBINPUTS"]? || ""}"
+          env["BSTINPUTS"] = "#{dir}#{Config::PATH_SEPARATOR}#{ENV["BSTINPUTS"]? || ""}"
           Process.run(executable, [runner.jobname], env: env, chdir: runner.outdir.to_s,
             output: output, error: output)
         else

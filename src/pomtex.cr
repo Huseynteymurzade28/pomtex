@@ -154,7 +154,8 @@ module Pomtex
 
     private def watch_command : Int32
       file = source_argument
-      Signal::INT.trap do
+      # Ctrl+C (SIGINT/SIGTERM/SIGHUP on Unix, console control events on Windows).
+      Process.on_terminate do
         STDERR.puts
         UI.info "stopped watching"
         exit 0
@@ -398,7 +399,7 @@ module Pomtex
     end
 
     private def inside?(path : Path, dir : Path) : Bool
-      path.to_s.starts_with?(dir.to_s.rchop('/') + "/")
+      Config.inside?(path, dir)
     end
   end
 end

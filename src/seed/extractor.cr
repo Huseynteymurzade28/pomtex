@@ -39,7 +39,15 @@ module Pomtex::Seed
           when '2'
             prepare_parent(root, target)
             File.delete(target) if File.symlink?(target) || File.file?(target)
-            File.symlink(entry.link, target)
+            {% if flag?(:win32) %}
+              # Symlinks need Developer Mode or admin rights on Windows: copy the
+              # target instead when it is already unpacked, inside the tree.
+              source = sanitize(Path[relative].parent.join(entry.link).normalize.to_posix.to_s)
+              next unless source && File.file?(Path[root].join(source))
+              File.copy(Path[root].join(source), target)
+            {% else %}
+              File.symlink(entry.link, target)
+            {% end %}
             written << relative
           when '1'
             source = sanitize(rename.call(entry.link) || "")
@@ -121,6 +129,10 @@ module Pomtex::Seed
     def sanitize(name : String) : String?
       parts = name.split('/').reject { |part| part.empty? || part == "." }
       return nil if parts.empty? || parts.any?("..") || name.starts_with?('/')
+      # Backslashes and drive letters are path syntax on Windows.
+      {% if flag?(:win32) %}
+        return nil if parts.any? { |part| part.includes?('\\') || part.includes?(':') }
+      {% end %}
       parts.join('/')
     end
 
@@ -128,7 +140,7 @@ module Pomtex::Seed
       parent = target.parent
       Dir.mkdir_p(parent)
       real = File.realpath(parent)
-      unless real == root || real.starts_with?(root + "/")
+      unless real == root || Config.inside?(real, root)
         raise Error.new("refusing to write outside #{root}: #{target}")
       end
     end

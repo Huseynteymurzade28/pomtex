@@ -2,7 +2,8 @@ require "path"
 
 # Paths, constants and seed metadata shared by every pomtex component.
 #
-# Layout under the cache root (default `~/.cache/pomtex`, honours `$XDG_CACHE_HOME`):
+# Layout under the cache root (default `~/.cache/pomtex`, honours `$XDG_CACHE_HOME`;
+# `%LOCALAPPDATA%\pomtex` on Windows):
 #
 #     rind/         the portable TeX kernel (TinyTeX-1), bin/<PLATFORM>/...
 #     texmf/        the user texmf tree that arils are unpacked into
@@ -26,9 +27,16 @@ module Pomtex
     {% elsif flag?(:linux) && flag?(:x86_64) %}
       PLATFORM              = "x86_64-linux"
       RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-linux-x86_64-%s.tar.xz"
+    {% elsif flag?(:win32) && flag?(:x86_64) %}
+      PLATFORM = "windows"
+      # A 7-Zip self-extractor that unpacks `TinyTeX/` into its working directory.
+      RIND_ARCHIVE_TEMPLATE = "TinyTeX-1-windows-%s.exe"
     {% else %}
-      {% raise "pomtex supports x86_64 and aarch64 Linux, and macOS" %}
+      {% raise "pomtex supports x86_64 and aarch64 Linux, macOS and x86_64 Windows" %}
     {% end %}
+
+    # Separates entries of PATH and of kpathsea search paths (TEXINPUTS, ...).
+    PATH_SEPARATOR = {{ flag?(:win32) ? ';' : ':' }}
 
     REPO = "Huseynteymurzade28/pomtex"
 
@@ -40,7 +48,7 @@ module Pomtex
     # The rind: a TinyTeX-1 bundle, which ships pdftex/xetex/luatex binaries and prebuilt formats.
     RIND_REPO           = "rstudio/tinytex-releases"
     RIND_PINNED_VERSION = "v2026.10"
-    # The bundle's top directory: `.TinyTeX` on Linux, `TinyTeX` on macOS.
+    # The bundle's top directory: `.TinyTeX` on Linux, `TinyTeX` on macOS and Windows.
     RIND_TOP_DIRS = {".TinyTeX", "TinyTeX"}
 
     DEFAULT_JOBS          =  6
@@ -88,8 +96,42 @@ module Pomtex
       if custom = ENV["POMTEX_HOME"]?.presence
         return Path[custom].expand(home: true)
       end
+      {% if flag?(:win32) %}
+        if local = ENV["LOCALAPPDATA"]?.presence
+          return Path[local].join("pomtex")
+        end
+      {% end %}
       base = ENV["XDG_CACHE_HOME"]?.presence || Path.home.join(".cache").to_s
       Path[base].expand(home: true).join("pomtex")
+    end
+
+    # The file name of program `name` on this platform (`pdflatex.exe` on Windows).
+    def executable_name(name : String) : String
+      {% if flag?(:win32) %}
+        name.ends_with?(".exe") ? name : "#{name}.exe"
+      {% else %}
+        name
+      {% end %}
+    end
+
+    # A path as TeX and kpathsea want it: forward slashes on every platform.
+    def tex_path(path : Path | String) : String
+      {% if flag?(:win32) %}
+        path.to_s.gsub('\\', '/')
+      {% else %}
+        path.to_s
+      {% end %}
+    end
+
+    # Whether `path` lies below the directory `dir`.
+    def inside?(path : Path | String, dir : Path | String) : Bool
+      prefix = dir.to_s.rstrip(File::SEPARATOR).rstrip('/')
+      path = path.to_s
+      {% if flag?(:win32) %}
+        # Windows paths are case-insensitive and may mix both separators.
+        path, prefix = path.downcase.gsub('\\', '/'), prefix.downcase.gsub('\\', '/')
+      {% end %}
+      path.starts_with?(prefix + "/")
     end
 
     def rind_dir : Path
