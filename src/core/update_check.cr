@@ -51,6 +51,9 @@ module Pomtex::Core
 
     # How this binary was installed decides how to update it.
     def upgrade_hint(executable : String? = Process.executable_path) : String
+      {% if flag?(:win32) %}
+        return "irm https://raw.githubusercontent.com/#{Config::REPO}/main/install.ps1 | iex"
+      {% end %}
       if executable && (package = owner(executable, "pacman", ["-Qqo"]))
         "yay -S #{package}"
       elsif executable && homebrew?(executable)
